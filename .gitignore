@@ -1,0 +1,123 @@
+############################################
+# Python
+############################################
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+develop-eggs/
+.eggs/
+pip-wheel-metadata/
+*.manifest
+*.spec
+
+############################################
+# Virtual Environment
+############################################
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+############################################
+# Dependency / Lock (선택 정책)
+############################################
+# requirements.lock.txt 는 "커밋 대상"이므로 제외하지 않음
+# poetry.lock / Pipfile.lock 사용 시에만 아래 활성화
+# poetry.lock
+# Pipfile.lock
+
+############################################
+# FastAPI / Uvicorn
+############################################
+*.log
+logs/
+uvicorn.log
+
+############################################
+# AI / LLM / Vector / Cache
+############################################
+.cache/
+.cache_llm/
+.cache_rag/
+.cache_vector/
+.vectorstore/
+.faiss/
+.faiss_index/
+*.faiss
+*.bin
+*.pt
+*.pth
+*.onnx
+
+############################################
+# Uploaded / Generated Data
+############################################
+data/
+uploads/
+outputs/
+tmp/
+tmp_data/
+
+############################################
+# Environment Variables
+############################################
+.env
+.env.*
+!.env.example
+
+############################################
+# OS
+############################################
+.DS_Store
+Thumbs.db
+desktop.ini
+
+############################################
+# IDE / Editor
+############################################
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.iml
+
+############################################
+# Jupyter / Notebook
+############################################
+.ipynb_checkpoints/
+
+############################################
+# Test / Coverage
+############################################
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+############################################
+# Docker
+############################################
+docker-compose.override.yml
+
+############################################
+# Node (프론트엔드 포함 시)
+############################################
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+############################################
+# Security / Secrets
+############################################
+*.pem
+*.key
+*.crt
+secrets/

@@ -142,11 +142,11 @@ TRACE-AI의 모든 판단·실행·로그·감사를 하나의 실행 단위(run
 
 **체크리스트**
 
-- [ ] 요청마다 run_id 생성
-- [ ] LangGraph State에 run_id 존재
-- [ ] API 응답에 run_id 포함
-- [ ] 로그에서 run_id 확인 가능
-- [ ] 단일 run 추적 가능
+- [X] 요청마다 run_id 생성
+- [X] LangGraph State에 run_id 존재
+- [X] API 응답에 run_id 포함
+- [X] 로그에서 run_id 확인 가능
+- [X] 단일 run 추적 가능
 
 ---
 

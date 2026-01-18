@@ -142,11 +142,11 @@ TRACE-AI의 모든 판단·실행·로그·감사를 하나의 실행 단위(run
 
 **체크리스트**
 
-- [X] 요청마다 run_id 생성
-- [X] LangGraph State에 run_id 존재
-- [X] API 응답에 run_id 포함
-- [X] 로그에서 run_id 확인 가능
-- [X] 단일 run 추적 가능
+- [x] 요청마다 run_id 생성
+- [x] LangGraph State에 run_id 존재
+- [x] API 응답에 run_id 포함
+- [x] 로그에서 run_id 확인 가능
+- [x] 단일 run 추적 가능
 
 ---
 
@@ -159,6 +159,7 @@ TRACE-AI의 모든 기능이 얹힐 **LangGraph 실행 뼈대**를 만든다.
 **작업 내용**
 
 - Orchestrator Graph 생성
+- Dummy Node 생성
 - START → Dummy Node → END 구성
 - Node 실행 전/후 로그 출력
 - State 전달 구조 확인
@@ -169,9 +170,9 @@ TRACE-AI의 모든 기능이 얹힐 **LangGraph 실행 뼈대**를 만든다.
 
 **체크리스트**
 
-- [ ] Graph 실행 성공
-- [ ] 최소 3개 Node 존재
-- [ ] Node start/end 로그 출력
+- [x] Graph 실행 성공
+- [x] 최소 3개 Node 존재
+- [x] Node start/end 로그 출력
 
 ---
 

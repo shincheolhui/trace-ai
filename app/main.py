@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.health import router as health_router
+from app.api.v1.agent import router as agent_router
 from app.core.logging import setup_logging
 from app.core.run_context import generate_run_id, set_run_id
 
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RunIdMiddleware)
 
     app.include_router(health_router, prefix="/api/v1")
+    app.include_router(agent_router, prefix="/api/v1")
     return app
 
 app = create_app()

@@ -29,17 +29,15 @@ TRACE-AI 프로젝트 구조 정의서 (상세 설명 포함)
 ## 2. 프로젝트 루트 구조
 
 ```
-
 trace-ai/
 ├─ README.md
-├─ pyproject.toml
+├─ pyproject.toml # 또는 requirements.txt
 ├─ .env.example
 ├─ .gitignore
 ├─ docs/
 ├─ app/
 ├─ ui/
 ├─ scripts/
-
 ```
 
 ### 루트 파일 설명
@@ -64,7 +62,6 @@ trace-ai/
 ## 3. docs/ 디렉터리 구조
 
 ```
-
 docs/
 ├─ 01_PRD.md
 ├─ 02_FEATURE_SPEC.md
@@ -78,7 +75,6 @@ docs/
 ├─ 10_TEST_PLAN.md
 ├─ 11_PROJECT_PLAN_TRACE_AI.md
 ├─ 12_PROJECT_STRUCTURE.md
-
 ```
 
 ### 문서 관리 원칙
@@ -96,7 +92,6 @@ docs/
 ## 4. app/ 디렉터리 (Backend: FastAPI)
 
 ```
-
 app/
 ├─ main.py
 ├─ api/
@@ -107,7 +102,6 @@ app/
 ├─ integrations/
 ├─ data/
 └─ tests/
-
 ```
 
 ---
@@ -128,33 +122,31 @@ app/
 ### 4.2 app/api/ (API Layer)
 
 ```
-
 api/
 └─ v1/
-├─ agent.py
-├─ admin_knowledge.py
-├─ runs.py
-└─ health.py
-
+   ├─ agent.py
+   ├─ admin_knowledge.py
+   ├─ runs.py
+   └─ health.py
 ```
 
-#### 공통 원칙
+### 공통 원칙
 - API는 **얇아야 한다**
 - 검증 → 서비스 호출 → 응답 변환만 담당
 
-#### agent.py
+### agent.py
 - Agent 실행/재개/승인 API
 - LangGraph 실행은 service를 통해 간접 호출
 
-#### admin_knowledge.py
+### admin_knowledge.py
 - 지식 저장소 업로드/관리 API
 - 관리자 전용 성격 (MVP에서는 단순화)
 
-#### runs.py
+### runs.py
 - run_id 기준 로그/감사 조회 API
 - 실행 결과를 “설명”하기 위한 조회 전용
 
-#### health.py
+### health.py
 - 헬스체크 API
 - 외부 의존성 호출 금지
 
@@ -163,41 +155,47 @@ api/
 ### 4.3 app/core/ (공통 인프라)
 
 ```
-
 core/
 ├─ config.py
 ├─ logging.py
 ├─ errors.py
 ├─ run_context.py
 └─ constants.py
-
 ```
 
-#### config.py
+### config.py
 - 환경변수 로딩
 - 설정 객체 정의
 - 실행 환경 판단 로직 포함 가능
 
-#### logging.py
+### logging.py
 - JSON 구조화 로그 포맷 정의
 - run_id 자동 포함
 - 로그 출력 방식의 단일 기준
 
-#### run_context.py
+### run_context.py
 - run_id 생성 및 요청 스코프 전파
 - FastAPI 미들웨어와 연동
 
-#### errors.py
+### errors.py
 - 표준 예외 클래스
 - 에러 코드/메시지 정의
 
-#### constants.py
+### constants.py
 - 문자열/상수 정의
 - 매직 스트링 금지 목적
 
 ---
 
 ### 4.4 app/schemas/ (Pydantic Models)
+
+```
+schemas/
+├─ common.py
+├─ agent.py
+├─ knowledge.py
+└─ runs.py
+```
 
 - API Request / Response 모델 정의
 - LangGraph State와는 분리
@@ -208,28 +206,26 @@ core/
 ### 4.5 app/services/ (Use Case Layer)
 
 ```
-
 services/
 ├─ agent_service.py
 ├─ knowledge_service.py
 ├─ audit_service.py
 └─ log_service.py
-
 ```
 
-#### agent_service.py
+### agent_service.py
 - run 실행/재개/결과 병합
 - LangGraph 호출의 유일한 진입점
 
-#### knowledge_service.py
+### knowledge_service.py
 - 문서 파싱/임베딩/저장/검색
 - Vector DB 추상화 사용
 
-#### audit_service.py
+### audit_service.py
 - run 단위 감사 정보 생성
 - 승인/판단/근거 통합
 
-#### log_service.py
+### log_service.py
 - 실행 로그 저장/조회
 - 구조화 로그 파일 관리
 
@@ -238,33 +234,43 @@ services/
 ### 4.6 app/agent/ (LangGraph 영역)
 
 ```
-
 agent/
 ├─ state.py
 ├─ orchestrator.py
 ├─ nodes/
+│  ├─ init_run.py
+│  ├─ classify_intent.py
+│  ├─ route_plan.py
+│  ├─ merge_results.py
+│  ├─ approval_gate.py
+│  └─ finalize_audit.py
 ├─ subgraphs/
+│  ├─ compliance_graph.py
+│  ├─ rca_graph.py
+│  └─ workflow_graph.py
 └─ prompts/
-
+   ├─ compliance.md
+   ├─ rca.md
+   └─ workflow.md
 ```
 
-#### state.py
+### state.py
 - LangGraph State 정의
 - 모든 노드가 공유하는 데이터 구조
 
-#### orchestrator.py
+### orchestrator.py
 - 메인 LangGraph 정의
 - 서브그래프 연결 및 실행 순서 관리
 
-#### nodes/
+### nodes/
 - 공통 노드 모음
 - intent 분류, 승인 게이트, 결과 병합 등
 
-#### subgraphs/
+### subgraphs/
 - Compliance / RCA / Workflow 서브그래프
 - 독립 실행 가능해야 함
 
-#### prompts/
+### prompts/
 - 프롬프트 템플릿 관리
 - 코드와 분리하여 수정 용이성 확보
 
@@ -273,33 +279,43 @@ agent/
 ### 4.7 app/integrations/ (외부 연동)
 
 ```
-
 integrations/
 ├─ llm/
+│  └─ openrouter_client.py
 ├─ vectorstore/
+│  ├─ base.py
+│  ├─ faiss_store.py
+│  └─ milvus_store.py
 ├─ parsers/
+│  ├─ pdf_parser.py
+│  ├─ text_parser.py
+│  └─ log_parser.py
 ├─ tools/
+│  ├─ tool_registry.py
+│  ├─ mock_tools.py
+│  ├─ jira_tool.py
+│  └─ slack_tool.py
 └─ storage/
-
+   └─ local_fs.py
 ```
 
-#### llm/
+### llm/
 - OpenRouter 호출 래퍼
 - 재시도/타임아웃 처리 포함
 
-#### vectorstore/
+### vectorstore/
 - Vector DB 인터페이스
 - FAISS / Milvus 구현 분리
 
-#### parsers/
+### parsers/
 - 문서/로그 파싱 전용
 - 비즈니스 로직 금지
 
-#### tools/
+### tools/
 - 외부 도구(Jira/Slack) 연동
 - mock/real 구현 분리
 
-#### storage/
+### storage/
 - 로컬 파일 저장
 - 로그/감사/업로드 파일 관리
 
@@ -314,6 +330,13 @@ integrations/
 
 ### 4.9 app/tests/
 
+```
+tests/
+├─ test_health.py
+├─ test_run_id.py
+└─ test_agent_smoke.py
+```
+
 - 최소 스모크 테스트
 - 구조 변경 시 깨짐 방지 목적
 
@@ -322,13 +345,11 @@ integrations/
 ## 5. ui/ 디렉터리 (Chainlit)
 
 ```
-
 ui/
 ├─ app.py
 ├─ chainlit.md
 ├─ components/
 └─ assets/
-
 ```
 
 - app.py: Chainlit 엔트리포인트
@@ -340,11 +361,9 @@ ui/
 ## 6. scripts/ 디렉터리
 
 ```
-
 scripts/
 ├─ seed_mock_docs.py
 ├─ run_smoke.sh
-
 ```
 
 - 개발 편의용 스크립트
@@ -364,9 +383,7 @@ scripts/
 
 ## 8. 최종 선언
 
-본 문서는 TRACE-AI 프로젝트의  
-**구조적 단일 기준 문서**이며,  
-모든 코드 배치는 본 문서를 따른다.
+본 문서는 TRACE-AI 프로젝트의 **구조적 단일 기준 문서**이며, 모든 코드 배치는 본 문서를 따른다.
 
 ---
 

@@ -8,7 +8,7 @@
 
 # TRACE-AI
 
-## 6. 아키텍처 설계서 (Architecture Design)
+## 05. 아키텍처 설계서 (Architecture Design)
 
 ---
 
@@ -304,6 +304,4 @@ LangGraph Orchestrator
 
 다음 문서는 이 아키텍처를 **에이전트 상태 흐름 관점에서 구체화하는**
 
-👉 **7. LangGraph 워크플로우 상세 설계서** 입니다.
-
-계속 진행하시겠습니까?
+👉 **06. LangGraph 워크플로우 상세 설계서** 입니다.

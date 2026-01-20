@@ -8,7 +8,7 @@
 
 # TRACE-AI
 
-## 5. 유스케이스 명세서 (Use Case Specification)
+## 04. 유스케이스 명세서 (Use Case Specification)
 
 ---
 
@@ -259,6 +259,4 @@ UC-06 → UC-07 / UC-08
 
 다음 문서는 시스템 구조 관점에서 이를 정리하는
 
-👉 **6. 아키텍처 설계서 (Architecture Design)** 입니다.
-
-계속 진행하시겠습니까?
+👉 **05. 아키텍처 설계서 (Architecture Design)** 입니다.

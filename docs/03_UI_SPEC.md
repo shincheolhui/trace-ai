@@ -8,7 +8,7 @@
 
 # TRACE-AI
 
-## 4. 화면 설계서 (UI Specification)
+## 03. 화면 설계서 (UI Specification)
 
 ---
 
@@ -298,6 +298,4 @@ TRACE-AI의 UI는 다음 원칙을 따른다.
 
 다음 문서는 사용자 행동 중심으로 흐름을 정의하는
 
-👉 **5. 유스케이스(Use Case Specification)** 입니다.
-
-계속 진행하시겠습니까?
+👉 **04. 유스케이스(Use Case Specification)** 입니다.

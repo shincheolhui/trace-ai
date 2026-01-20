@@ -235,12 +235,31 @@ AI 판단의 근거가 되는 문서를 시스템이 "기억"할 수 있게 만�
 
 **작업 내용**
 
-- 문서 업로드 API 구현
-- 텍스트 파싱
-- 청크 분할
-- 임베딩 생성
-- Vector DB 저장
-- 단순 검색 API 구현
+- 문서 업로드 API 구현 (`POST /api/v1/admin/knowledge-store/ingest`)
+- 텍스트/PDF 파싱 (`app/integrations/parsers/`)
+- 청크 분할 (500자 기준, 50자 오버랩)
+- OpenRouter 임베딩 생성 (`text-embedding-3-small`)
+- FAISS Vector DB 저장 (`app/integrations/vectorstore/faiss_store.py`)
+- 검색 API 구현 (`POST /api/v1/admin/knowledge-store/search`)
+- 문서 목록/삭제/통계 API 구현
+
+**구현된 API 엔드포인트**
+
+| Method | Endpoint | 설명 |
+|--------|----------|------|
+| POST | `/api/v1/admin/knowledge-store/ingest` | 문서 적재 |
+| POST | `/api/v1/admin/knowledge-store/search` | 지식 검색 |
+| GET | `/api/v1/admin/knowledge-store/docs` | 문서 목록 |
+| DELETE | `/api/v1/admin/knowledge-store/docs/{doc_id}` | 문서 삭제 |
+| GET | `/api/v1/admin/knowledge-store/stats` | 저장소 통계 |
+
+**store_type 옵션**
+
+| 값 | 설명 |
+|---|---|
+| `policy` | 정책/규정 문서 |
+| `incident` | 장애 사례 |
+| `system` | 시스템/업무 문서 |
 
 **브랜치**
 
@@ -248,9 +267,122 @@ AI 판단의 근거가 되는 문서를 시스템이 "기억"할 수 있게 만�
 
 **체크리스트**
 
-- [ ] 문서 업로드 가능
-- [ ] 임베딩 생성 성공
-- [ ] 검색 결과 반환
+- [x] 문서 업로드 가능
+- [x] 임베딩 생성 성공
+- [x] 검색 결과 반환
+- [x] 문서 목록 조회
+- [x] 문서 삭제
+- [x] 저장소 통계 조회
+
+---
+
+#### W2-1 테스트 방법 (PowerShell)
+
+**사전 준비**: Backend 서버 실행
+
+```powershell
+uvicorn app.main:app --reload
+```
+
+**1. 문서 적재 (Ingest)**
+
+```powershell
+curl.exe -X POST "http://127.0.0.1:8000/api/v1/admin/knowledge-store/ingest" `
+  -H "X-Admin-Token: dev-admin-token" `
+  -F "store_type=policy" `
+  -F "tags=security,password" `
+  -F "files=@test_policy.txt"
+```
+
+**2. 저장소 통계 조회 (Stats)**
+
+```powershell
+curl.exe -X GET "http://127.0.0.1:8000/api/v1/admin/knowledge-store/stats?store_type=policy" `
+  -H "X-Admin-Token: dev-admin-token"
+```
+
+**3. 문서 목록 조회 (List)**
+
+```powershell
+curl.exe -X GET "http://127.0.0.1:8000/api/v1/admin/knowledge-store/docs?store_type=policy" `
+  -H "X-Admin-Token: dev-admin-token"
+```
+
+**4. 지식 검색 (Search)**
+
+```powershell
+curl.exe -X POST "http://127.0.0.1:8000/api/v1/admin/knowledge-store/search" `
+  -H "X-Admin-Token: dev-admin-token" `
+  -H "Content-Type: application/json" `
+  -d '{"query": "비밀번호 규칙", "store_type": "policy", "top_k": 5}'
+```
+
+**5. 문서 삭제 (Delete)**
+
+```powershell
+curl.exe -X DELETE "http://127.0.0.1:8000/api/v1/admin/knowledge-store/docs/{doc_id}?store_type=policy" `
+  -H "X-Admin-Token: dev-admin-token"
+```
+
+---
+
+#### W2-1 테스트 결과 (2026-01-20)
+
+**테스트 환경**
+- Windows 10, Python 3.13.11
+- Backend: FastAPI + Uvicorn
+- Vector DB: FAISS (local)
+- Embedding: OpenRouter `text-embedding-3-small`
+
+**테스트 결과 요약**
+
+| API | 결과 | 상세 |
+|-----|------|------|
+| Ingest (적재) | ✓ 성공 | `status: completed`, 1개 청크 생성 |
+| Stats (통계) | ✓ 성공 | 문서 1개, 청크 1개 확인 |
+| Docs (목록) | ✓ 성공 | `test_policy.txt`, 태그 `[security, password]` |
+| Search (검색) | ✓ 성공 | "비밀번호 규칙" 검색 → score 0.686 매칭 |
+| Delete (삭제) | ✓ 성공 | 문서 삭제 완료 |
+
+**테스트 로그**
+
+```
+# 1. 문서 적재
+{"ingest_id":"f035704e-...","status":"completed","store_type":"policy",
+ "doc_ids":["c020cea0-..."],"chunk_count":1,"error":null}
+
+# 2. 저장소 통계
+{"store_type":"policy","document_count":1,"chunk_count":1}
+
+# 3. 문서 목록
+{"store_type":"policy","documents":[{"doc_id":"c020cea0-...",
+ "filename":"test_policy.txt","status":"completed","chunk_count":1,
+ "tags":["security","password"],...}],"total_count":1}
+
+# 4. 검색 결과
+{"query":"비밀번호 규칙","store_type":"policy",
+ "results":[{"chunk_id":"c020cea0-..._0","score":0.686,
+ "text":"비밀번호는 8자 이상이어야 합니다. 특수문자를 포함해야 합니다.",
+ ...}],"total_count":1}
+
+# 5. 문서 삭제
+{"doc_id":"c020cea0-...","store_type":"policy","deleted":true,
+ "message":"Document deleted successfully"}
+```
+
+**검증 완료 항목**
+1. ✓ 문서 적재 파이프라인: 텍스트 파싱 → 청킹 → 임베딩 → FAISS 저장
+2. ✓ 벡터 검색: 쿼리 임베딩 → 유사도 검색 → 결과 반환
+3. ✓ 메타데이터 관리: 문서 ID, 태그, 생성 시간 등 추적
+4. ✓ CRUD 전체 동작: 생성, 조회, 검색, 삭제 모두 정상
+
+---
+
+# W2-1 완료 선언
+
+> W2-1 완료 (2026-01-20)
+>
+> 지식 저장소 업로드 파이프라인 구현 완료. 문서 적재(Ingest), 검색(Search), 목록 조회(List), 삭제(Delete), 통계(Stats) API 모두 정상 동작 확인. OpenRouter 임베딩 + FAISS 벡터 저장소 기반으로 정책/장애사례/시스템 문서를 저장하고 유사도 검색이 가능한 상태.
 
 ---
 

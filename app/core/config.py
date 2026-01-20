@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "openai/text-embedding-3-small"
     EMBEDDING_DIMENSION: int = 1536
     
+    # LLM 모델 (채팅/추론용)
+    LLM_MODEL: str = "openai/gpt-4o-mini"
+    LLM_TEMPERATURE: float = 0.3
+    LLM_MAX_TOKENS: int = 2000
+    
     # ===== 지식 저장소 =====
     DATA_DIR: Path = Path("app/data")
     KNOWLEDGE_STORE_DIR: Path = Path("app/data/knowledge")

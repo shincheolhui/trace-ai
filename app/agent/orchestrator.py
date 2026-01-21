@@ -2,7 +2,7 @@
 """LangGraph 메인 오케스트레이터 - 서브그래프 라우팅"""
 from __future__ import annotations
 
-import logging
+import time
 from functools import lru_cache
 from typing import Literal
 
@@ -13,8 +13,16 @@ from app.agent.nodes.classify_intent import classify_intent_node
 from app.agent.subgraphs.compliance_graph import get_compliance_graph
 from app.agent.subgraphs.rca_graph import get_rca_graph
 from app.agent.subgraphs.workflow_graph import get_workflow_graph
+from app.core.logging import (
+    get_structured_logger,
+    log_node_start,
+    log_node_end,
+    log_decision,
+    log_action,
+    log_error,
+)
 
-logger = logging.getLogger(__name__)
+logger = get_structured_logger(__name__)
 
 
 # ===== 라우터 함수 =====
@@ -24,33 +32,38 @@ def route_by_intent(state: AgentState) -> Literal["COMPLIANCE", "RCA", "WORKFLOW
     intent = state.intent
     run_id = state.run_id
     
-    logger.info(f"[{run_id}] Routing by intent: {intent}")
-    
     if intent == "compliance":
-        return "COMPLIANCE"
+        target = "COMPLIANCE"
     elif intent == "rca":
-        return "RCA"
+        target = "RCA"
     elif intent == "workflow":
-        return "WORKFLOW"
+        target = "WORKFLOW"
     elif intent == "mixed":
-        logger.info(f"[{run_id}] Mixed intent, executing multiple subgraphs")
-        return "MIXED"
+        target = "MIXED"
     else:
-        # unknown
-        logger.info(f"[{run_id}] Unknown intent, ending")
-        return "END"
+        target = "END"
+    
+    # 라우팅 결정 로그
+    log_decision(logger, run_id, "routing", target, f"intent={intent}")
+    
+    return target
 
 
 def compliance_subgraph_node(state: AgentState) -> dict:
     """규정 위반 감지 서브그래프 실행 노드"""
     run_id = state.run_id
-    logger.info(f"[{run_id}] Executing compliance subgraph")
+    log_node_start(logger, run_id, "COMPLIANCE_SUBGRAPH")
+    start_time = time.perf_counter()
     
     try:
+        log_action(logger, run_id, "subgraph_invoke", "Compliance 서브그래프 실행")
         compliance_graph = get_compliance_graph()
         
         # 서브그래프 실행
         result = compliance_graph.invoke(state.model_dump())
+        
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        log_node_end(logger, run_id, "COMPLIANCE_SUBGRAPH", duration_ms, "success")
         
         # 결과에서 필요한 필드만 추출하여 반환
         return {
@@ -61,7 +74,9 @@ def compliance_subgraph_node(state: AgentState) -> dict:
         }
         
     except Exception as e:
-        logger.error(f"[{run_id}] Compliance subgraph failed: {e}")
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        log_error(logger, run_id, "SubgraphError", str(e), "COMPLIANCE_SUBGRAPH")
+        log_node_end(logger, run_id, "COMPLIANCE_SUBGRAPH", duration_ms, "error", {"error": str(e)})
         return {
             "errors": state.errors + [f"Compliance 서브그래프 실행 실패: {str(e)}"],
             "trace": {
@@ -74,13 +89,18 @@ def compliance_subgraph_node(state: AgentState) -> dict:
 def rca_subgraph_node(state: AgentState) -> dict:
     """장애 RCA 서브그래프 실행 노드"""
     run_id = state.run_id
-    logger.info(f"[{run_id}] Executing RCA subgraph")
+    log_node_start(logger, run_id, "RCA_SUBGRAPH")
+    start_time = time.perf_counter()
     
     try:
+        log_action(logger, run_id, "subgraph_invoke", "RCA 서브그래프 실행")
         rca_graph = get_rca_graph()
         
         # 서브그래프 실행
         result = rca_graph.invoke(state.model_dump())
+        
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        log_node_end(logger, run_id, "RCA_SUBGRAPH", duration_ms, "success")
         
         # 결과에서 필요한 필드만 추출하여 반환
         return {
@@ -92,7 +112,9 @@ def rca_subgraph_node(state: AgentState) -> dict:
         }
         
     except Exception as e:
-        logger.error(f"[{run_id}] RCA subgraph failed: {e}")
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        log_error(logger, run_id, "SubgraphError", str(e), "RCA_SUBGRAPH")
+        log_node_end(logger, run_id, "RCA_SUBGRAPH", duration_ms, "error", {"error": str(e)})
         return {
             "errors": state.errors + [f"RCA 서브그래프 실행 실패: {str(e)}"],
             "trace": {
@@ -105,13 +127,18 @@ def rca_subgraph_node(state: AgentState) -> dict:
 def workflow_subgraph_node(state: AgentState) -> dict:
     """업무 실행 계획 서브그래프 실행 노드"""
     run_id = state.run_id
-    logger.info(f"[{run_id}] Executing Workflow subgraph")
+    log_node_start(logger, run_id, "WORKFLOW_SUBGRAPH")
+    start_time = time.perf_counter()
     
     try:
+        log_action(logger, run_id, "subgraph_invoke", "Workflow 서브그래프 실행")
         workflow_graph = get_workflow_graph()
         
         # 서브그래프 실행
         result = workflow_graph.invoke(state.model_dump())
+        
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        log_node_end(logger, run_id, "WORKFLOW_SUBGRAPH", duration_ms, "success")
         
         # 결과에서 필요한 필드만 추출하여 반환
         return {
@@ -126,7 +153,9 @@ def workflow_subgraph_node(state: AgentState) -> dict:
         }
         
     except Exception as e:
-        logger.error(f"[{run_id}] Workflow subgraph failed: {e}")
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        log_error(logger, run_id, "SubgraphError", str(e), "WORKFLOW_SUBGRAPH")
+        log_node_end(logger, run_id, "WORKFLOW_SUBGRAPH", duration_ms, "error", {"error": str(e)})
         return {
             "errors": state.errors + [f"Workflow 서브그래프 실행 실패: {str(e)}"],
             "trace": {
@@ -139,7 +168,8 @@ def workflow_subgraph_node(state: AgentState) -> dict:
 def mixed_subgraph_node(state: AgentState) -> dict:
     """복합 요청 처리 - 다중 서브그래프 순차 실행 노드"""
     run_id = state.run_id
-    logger.info(f"[{run_id}] Executing MIXED subgraphs (compliance → rca → workflow)")
+    log_node_start(logger, run_id, "MIXED_SUBGRAPH", {"subgraphs": ["compliance", "rca", "workflow"]})
+    start_time = time.perf_counter()
     
     # 결과를 누적할 변수들
     compliance_result = None
@@ -155,7 +185,7 @@ def mixed_subgraph_node(state: AgentState) -> dict:
     
     # 1. Compliance 서브그래프 실행
     try:
-        logger.info(f"[{run_id}] MIXED: Running compliance subgraph")
+        log_action(logger, run_id, "mixed_subgraph", "Compliance 서브그래프 실행", {"step": 1})
         compliance_graph = get_compliance_graph()
         compliance_state = state.model_dump()
         compliance_state["context"] = context
@@ -167,16 +197,14 @@ def mixed_subgraph_node(state: AgentState) -> dict:
         evidence = result.get("evidence", evidence)
         trace["mixed_compliance"] = {"status": "success"}
         
-        logger.info(f"[{run_id}] MIXED: Compliance completed")
-        
     except Exception as e:
-        logger.error(f"[{run_id}] MIXED: Compliance failed: {e}")
+        log_error(logger, run_id, "MixedSubgraphError", str(e), "MIXED_COMPLIANCE")
         errors.append(f"Mixed-Compliance 실패: {str(e)}")
         trace["mixed_compliance"] = {"status": "error", "error": str(e)}
     
     # 2. RCA 서브그래프 실행
     try:
-        logger.info(f"[{run_id}] MIXED: Running RCA subgraph")
+        log_action(logger, run_id, "mixed_subgraph", "RCA 서브그래프 실행", {"step": 2})
         rca_graph = get_rca_graph()
         rca_state = state.model_dump()
         rca_state["context"] = context
@@ -189,16 +217,14 @@ def mixed_subgraph_node(state: AgentState) -> dict:
         evidence = result.get("evidence", evidence)
         trace["mixed_rca"] = {"status": "success"}
         
-        logger.info(f"[{run_id}] MIXED: RCA completed")
-        
     except Exception as e:
-        logger.error(f"[{run_id}] MIXED: RCA failed: {e}")
+        log_error(logger, run_id, "MixedSubgraphError", str(e), "MIXED_RCA")
         errors.append(f"Mixed-RCA 실패: {str(e)}")
         trace["mixed_rca"] = {"status": "error", "error": str(e)}
     
     # 3. Workflow 서브그래프 실행 (이전 분석 결과를 컨텍스트로 전달)
     try:
-        logger.info(f"[{run_id}] MIXED: Running Workflow subgraph")
+        log_action(logger, run_id, "mixed_subgraph", "Workflow 서브그래프 실행", {"step": 3})
         workflow_graph = get_workflow_graph()
         workflow_state = state.model_dump()
         workflow_state["context"] = context
@@ -220,10 +246,8 @@ def mixed_subgraph_node(state: AgentState) -> dict:
         evidence = result.get("evidence", evidence)
         trace["mixed_workflow"] = {"status": "success"}
         
-        logger.info(f"[{run_id}] MIXED: Workflow completed")
-        
     except Exception as e:
-        logger.error(f"[{run_id}] MIXED: Workflow failed: {e}")
+        log_error(logger, run_id, "MixedSubgraphError", str(e), "MIXED_WORKFLOW")
         errors.append(f"Mixed-Workflow 실패: {str(e)}")
         trace["mixed_workflow"] = {"status": "error", "error": str(e)}
     
@@ -240,7 +264,8 @@ def mixed_subgraph_node(state: AgentState) -> dict:
         "total_subgraphs": 3,
     }
     
-    logger.info(f"[{run_id}] MIXED: Completed {executed_count}/3 subgraphs")
+    duration_ms = (time.perf_counter() - start_time) * 1000
+    log_node_end(logger, run_id, "MIXED_SUBGRAPH", duration_ms, "success", {"executed": executed_count, "total": 3})
     
     return {
         "compliance_result": compliance_result,
@@ -259,7 +284,8 @@ def mixed_subgraph_node(state: AgentState) -> dict:
 def finalize_node(state: AgentState) -> dict:
     """최종 결과 정리 노드"""
     run_id = state.run_id
-    logger.info(f"[{run_id}] Finalizing agent execution")
+    log_node_start(logger, run_id, "FINALIZE")
+    start_time = time.perf_counter()
     
     # 분석 결과 통합
     analysis_results = dict(state.analysis_results)
@@ -297,6 +323,9 @@ def finalize_node(state: AgentState) -> dict:
         
         if summaries:
             analysis_results["integrated_summary"] = " | ".join(summaries)
+    
+    duration_ms = (time.perf_counter() - start_time) * 1000
+    log_node_end(logger, run_id, "FINALIZE", duration_ms, "success", {"intent": state.intent})
     
     return {
         "analysis_results": analysis_results,

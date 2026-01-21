@@ -962,11 +962,175 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 
 ### W3-1 구조화 로그 시스템
 
+**작업 목적**
+
+Agent 실행 과정을 추적 가능한 형태로 로깅. 노드 시작/종료, 의사결정, 액션을 구조화된 JSON 형태로 기록하여 디버깅 및 감사 지원.
+
 **작업 내용**
 
-- JSON 로그 포맷
-- Node start/end
-- 판단/실행 로그
+- JSON 로그 포맷 (`event_type`, `node_name`, `duration_ms`, `data` 필드 추가)
+- Node start/end 로깅 유틸리티 함수
+- 판단(Decision)/실행(Action) 로그 유틸리티 함수
+- `@trace_node` 데코레이터 구현
+- 오케스트레이터 노드에 구조화 로그 적용
+
+**구현된 파일**
+
+| 파일 | 설명 |
+|------|------|
+| `app/core/logging.py` | 구조화 로그 시스템 (LogEventType, 유틸리티 함수, 데코레이터) |
+| `app/agent/orchestrator.py` | 구조화 로그 적용 (라우팅, 서브그래프 노드) |
+
+**LogEventType 종류**
+
+| 이벤트 타입 | 설명 | 사용처 |
+|-------------|------|--------|
+| `node_start` | 노드 실행 시작 | 모든 노드 진입 시 |
+| `node_end` | 노드 실행 종료 | 모든 노드 완료 시 (duration 포함) |
+| `decision` | 의사결정 기록 | 라우팅, 분기 결정 시 |
+| `action` | 액션 실행 기록 | 서브그래프 호출, API 호출 등 |
+| `error` | 오류 발생 기록 | 예외 발생 시 |
+| `llm_call` | LLM 호출 기록 | LLM API 호출 시 |
+| `retrieval` | 검색 기록 | Knowledge Store 검색 시 |
+| `approval` | 승인 관련 기록 | 승인 요청/처리 시 |
+
+**유틸리티 함수**
+
+| 함수 | 설명 |
+|------|------|
+| `get_structured_logger(name)` | 구조화 로그용 logger 생성 |
+| `log_node_start(logger, run_id, node_name, data)` | 노드 시작 로그 |
+| `log_node_end(logger, run_id, node_name, duration_ms, status, data)` | 노드 종료 로그 |
+| `log_decision(logger, run_id, decision_type, result, reason)` | 의사결정 로그 |
+| `log_action(logger, run_id, action_type, description, data)` | 액션 로그 |
+| `log_error(logger, run_id, error_type, message, node_name)` | 오류 로그 |
+
+**브랜치**
+
+- `w3-1-structured-log`
+
+**체크리스트**
+
+- [x] LogEventType 정의
+- [x] 구조화 로그 유틸리티 함수 구현
+- [x] `@trace_node` 데코레이터 구현
+- [x] JsonFormatter에 event_type, node_name, duration_ms, data 필드 추가
+- [x] 오케스트레이터 노드에 구조화 로그 적용
+
+---
+
+#### W3-1 테스트 방법 (PowerShell)
+
+**사전 준비**: Backend 서버 실행
+
+```powershell
+uvicorn app.main:app --reload
+```
+
+**테스트 요청 파일** (`test_request.json`)
+
+```json
+{
+  "query": "이 비밀번호가 보안 정책에 맞는지 확인해주세요: mypass123"
+}
+```
+
+**Agent 실행**
+
+```powershell
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_request.json"
+```
+
+---
+
+#### W3-1 테스트 결과 (2026-01-21)
+
+**테스트 환경**
+- Windows 10, Python 3.13.11
+- Backend: FastAPI + Uvicorn
+- LLM: OpenRouter `openai/gpt-4o-mini`
+
+**테스트 결과 요약**
+
+| 항목 | 결과 | 상세 |
+|------|------|------|
+| Intent 분류 | ✓ 성공 | `compliance` 정상 분류 |
+| Decision 로그 | ✓ 성공 | `event_type: decision`, `routing = COMPLIANCE` |
+| Node Start 로그 | ✓ 성공 | `event_type: node_start`, `node_name` 포함 |
+| Action 로그 | ✓ 성공 | `event_type: action`, `subgraph_invoke` |
+| Node End 로그 | ✓ 성공 | `event_type: node_end`, `duration_ms` 포함 |
+| 실행 시간 측정 | ✓ 성공 | COMPLIANCE_SUBGRAPH: 2856.50ms |
+
+**구조화 로그 출력 예시**
+
+```json
+// Decision 로그 (라우팅 결정)
+{
+  "timestamp": "2026-01-21T12:31:34.192315+00:00",
+  "level": "INFO",
+  "message": "[37d47084-...] DECISION: routing = COMPLIANCE",
+  "event_type": "decision",
+  "data": {
+    "decision_type": "routing",
+    "result": "COMPLIANCE",
+    "reason": "intent=compliance"
+  }
+}
+
+// Node Start 로그
+{
+  "timestamp": "2026-01-21T12:31:34.192766+00:00",
+  "level": "INFO",
+  "message": "[37d47084-...] Node START: COMPLIANCE_SUBGRAPH",
+  "event_type": "node_start",
+  "node_name": "COMPLIANCE_SUBGRAPH"
+}
+
+// Action 로그
+{
+  "timestamp": "2026-01-21T12:31:34.192948+00:00",
+  "level": "INFO",
+  "message": "[37d47084-...] ACTION: subgraph_invoke - Compliance 서브그래프 실행",
+  "event_type": "action",
+  "data": {
+    "action_type": "subgraph_invoke",
+    "description": "Compliance 서브그래프 실행"
+  }
+}
+
+// Node End 로그 (실행 시간 포함)
+{
+  "timestamp": "2026-01-21T12:31:37.049475+00:00",
+  "level": "INFO",
+  "message": "[37d47084-...] Node END: COMPLIANCE_SUBGRAPH (success, 2856.50ms)",
+  "event_type": "node_end",
+  "node_name": "COMPLIANCE_SUBGRAPH",
+  "duration_ms": 2856.504199997289,
+  "data": {"status": "success"}
+}
+```
+
+**실행 흐름 추적 (노드 트레이스)**
+
+| 단계 | 시간 | 이벤트 | 상세 |
+|------|------|--------|------|
+| 1 | 12:31:32.585 | classify_intent_node | 입력 분석 시작 |
+| 2 | 12:31:34.191 | Intent classified | `compliance` 분류 완료 |
+| 3 | 12:31:34.192 | **DECISION** | routing → `COMPLIANCE` |
+| 4 | 12:31:34.192 | **Node START** | `COMPLIANCE_SUBGRAPH` |
+| 5 | 12:31:34.192 | **ACTION** | `subgraph_invoke` 실행 |
+| 6 | 12:31:34.202 ~ 12:31:37.048 | Subgraph 내부 | 정책 검색 → 분석 |
+| 7 | 12:31:37.049 | **Node END** | `COMPLIANCE_SUBGRAPH` (2856.50ms) |
+| 8 | 12:31:37.050 | **Node START** | `FINALIZE` |
+| 9 | 12:31:37.050 | **Node END** | `FINALIZE` (0.01ms) |
+
+---
+
+# W3-1 완료 선언
+
+> W3-1 완료 (2026-01-21)
+>
+> 구조화 로그 시스템 구현 완료. `event_type`, `node_name`, `duration_ms`, `data` 필드를 포함한 JSON 로그 포맷 구현. `log_node_start`, `log_node_end`, `log_decision`, `log_action`, `log_error` 유틸리티 함수와 `@trace_node` 데코레이터 구현. 오케스트레이터의 라우팅 결정과 서브그래프 노드(COMPLIANCE, RCA, WORKFLOW, MIXED, FINALIZE)에 구조화 로그 적용 완료. 노드 실행 시간 측정 및 전체 실행 흐름 추적 가능 상태.
 
 ---
 
@@ -978,6 +1142,10 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 - 승인 API
 - 승인 후 재개
 
+**브랜치**
+
+- `w3-2-approval-flow`
+
 ---
 
 ### W3-3 감사(Audit) 요약 생성
@@ -986,6 +1154,10 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 
 - run 단위 감사 JSON
 - 판단·근거·승인·실행 포함
+
+**브랜치**
+
+- `w3-3-audit-summary`
 
 ---
 
@@ -997,6 +1169,10 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 - 검색 실패 처리
 - 실패해도 감사 생성
 
+**브랜치**
+
+- `w3-4-error-handling`
+
 ---
 
 ### W3-5 데모 리허설 1차
@@ -1005,6 +1181,10 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 
 - 전체 시나리오 1회 실행
 - 설명 흐름 점검
+
+**브랜치**
+
+- `w3-5-demo-rehearsal`
 
 ---
 
@@ -1018,13 +1198,41 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 
 ### W4-1 데모 시나리오 고정
 
+**브랜치**
+
+- `w4-1-demo-scenario`
+
+---
+
 ### W4-2 UI 가독성 개선
+
+**브랜치**
+
+- `w4-2-ui-polish`
+
+---
 
 ### W4-3 문서 최종 점검
 
+**브랜치**
+
+- `w4-3-docs-final`
+
+---
+
 ### W4-4 최종 리허설
 
+**브랜치**
+
+- `w4-4-final-rehearsal`
+
+---
+
 ### W4-5 종료 선언 (Code Freeze)
+
+**브랜치**
+
+- `w4-5-code-freeze`
 
 ---
 

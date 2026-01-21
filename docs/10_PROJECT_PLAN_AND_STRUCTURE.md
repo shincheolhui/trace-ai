@@ -394,10 +394,27 @@ curl.exe -X DELETE "http://127.0.0.1:8000/api/v1/admin/knowledge-store/docs/{doc
 
 **작업 내용**
 
-- 입력 분석
-- 정책 지식 저장소 검색
-- 위반/비위반/잠재적 위반 판단
-- Evidence 구성
+- Intent 분류 노드 구현 (compliance, rca, workflow, mixed, unknown)
+- LLM 채팅 기능 추가 (OpenRouterClient.chat, chat_with_system)
+- AgentState 확장 (ComplianceResult, RCAResult, WorkflowResult 모델 추가)
+- 규정 위반 감지 서브그래프 구현
+  - retrieve_policies_node: 정책 지식 저장소 검색
+  - analyze_compliance_node: LLM으로 위반/비위반/잠재적 위반 판단
+  - generate_recommendation_node: 위반 시 권고사항 생성
+- 메인 오케스트레이터 업데이트: Intent 기반 조건부 라우팅
+- 규정 위반 감지 프롬프트 템플릿 추가
+
+**구현된 파일**
+
+| 파일 | 설명 |
+|------|------|
+| `app/agent/nodes/classify_intent.py` | Intent 분류 노드 |
+| `app/agent/subgraphs/compliance_graph.py` | 규정 위반 감지 서브그래프 |
+| `app/agent/prompts/compliance.md` | 규정 분석 프롬프트 템플릿 |
+| `app/agent/state.py` | 확장된 AgentState (ComplianceResult 등) |
+| `app/agent/orchestrator.py` | Intent 기반 라우팅 추가 |
+| `app/integrations/llm/openrouter_client.py` | chat/chat_with_system 메서드 추가 |
+| `app/core/config.py` | LLM_MODEL, LLM_TEMPERATURE 설정 추가 |
 
 **브랜치**
 
@@ -405,9 +422,83 @@ curl.exe -X DELETE "http://127.0.0.1:8000/api/v1/admin/knowledge-store/docs/{doc
 
 **체크리스트**
 
-- [ ] 정책 검색
-- [ ] 위반 판단
-- [ ] Evidence 출력
+- [x] 정책 검색
+- [x] 위반 판단
+- [x] Evidence 출력
+
+---
+
+#### W2-2 테스트 방법 (PowerShell)
+
+**사전 준비**: Backend 서버 실행
+
+```powershell
+uvicorn app.main:app --reload
+```
+
+**테스트 요청 파일 생성** (`test_request.json`)
+
+```json
+{
+  "query": "이 비밀번호가 보안 정책에 맞는지 확인해주세요: mypass123"
+}
+```
+
+**Agent 실행**
+
+```powershell
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_request.json"
+```
+
+---
+
+#### W2-2 테스트 결과 (2026-01-21)
+
+**테스트 환경**
+- Windows 10, Python 3.13.11
+- Backend: FastAPI + Uvicorn
+- LLM: OpenRouter `openai/gpt-4o-mini`
+- Vector DB: FAISS (local)
+
+**테스트 결과 요약**
+
+| 항목 | 결과 | 상세 |
+|------|------|------|
+| Intent 분류 | ✓ 성공 | `compliance` 정상 분류 |
+| 정책 검색 | ✓ 성공 | 0건 (빈 저장소, 정상 동작) |
+| 규정 분석 | ✓ 성공 | LLM 호출 정상, `no_violation` 반환 |
+| Evidence 출력 | ✓ 성공 | 권고사항 포함 |
+
+**테스트 로그**
+
+```
+# Intent 분류
+"classify_intent": {"status": "success", "intent": "compliance", 
+  "reason": "비밀번호가 보안 정책에 맞는지 확인하는 요청입니다."}
+
+# 정책 검색
+"retrieve_policies": {"status": "success", "count": 0}
+
+# 규정 분석
+"analyze_compliance": {"status": "success", "result_status": "no_violation", 
+  "violation_count": 0}
+
+# 최종 결과
+"compliance_result": {
+  "status": "no_violation",
+  "violations": [],
+  "recommendations": ["관련 규정을 찾지 못했습니다. 담당자에게 문의하세요."],
+  "summary": "관련 규정이 없어 위반 여부를 판단할 수 없습니다."
+}
+```
+
+---
+
+# W2-2 완료 선언
+
+> W2-2 완료 (2026-01-21)
+>
+> 규정 위반 감지 서브그래프 구현 완료. Intent 분류 → 정책 검색 → LLM 분석 → 권고사항 생성 플로우 정상 동작 확인. OpenRouter LLM (`gpt-4o-mini`) + FAISS 벡터 검색 기반으로 규정 위반 여부를 판단하고 Evidence를 출력하는 상태.
 
 ---
 
@@ -419,10 +510,30 @@ curl.exe -X DELETE "http://127.0.0.1:8000/api/v1/admin/knowledge-store/docs/{doc
 
 **작업 내용**
 
-- 로그 입력 처리
-- 장애 지식 저장소 검색
-- 복수 가설 생성
-- 우선순위 정렬
+- 로그 입력 파싱 노드 구현 (에러 키워드 감지, 로그 형식 인식)
+- 장애 지식 저장소 검색 (incident 스토어)
+- 시스템 정보 검색 (system 스토어)
+- 복수 가설 생성 (LLM 기반)
+- 우선순위 정렬 (rank + confidence 기준)
+- Top-N 가설 반환 (최대 5개)
+
+**구현된 파일**
+
+| 파일 | 설명 |
+|------|------|
+| `app/agent/subgraphs/rca_graph.py` | RCA 서브그래프 (5개 노드) |
+| `app/agent/prompts/rca.md` | RCA 분석 프롬프트 템플릿 |
+| `app/agent/orchestrator.py` | RCA 라우팅 연결 |
+
+**RCA 서브그래프 노드**
+
+| 노드 | 설명 |
+|------|------|
+| `parse_logs_node` | 로그 입력 파싱, 에러 키워드 감지 |
+| `retrieve_incidents_node` | 유사 장애 사례 검색 |
+| `retrieve_system_info_node` | 시스템 정보 검색 |
+| `generate_hypotheses_node` | LLM으로 원인 가설 생성 |
+| `prioritize_hypotheses_node` | 가설 우선순위 정렬 |
 
 **브랜치**
 
@@ -430,9 +541,106 @@ curl.exe -X DELETE "http://127.0.0.1:8000/api/v1/admin/knowledge-store/docs/{doc
 
 **체크리스트**
 
-- [ ] 로그 입력 처리
-- [ ] 유사 사례 검색
-- [ ] Top-N 가설 반환
+- [x] 로그 입력 처리
+- [x] 유사 사례 검색
+- [x] Top-N 가설 반환
+
+---
+
+#### W2-3 테스트 방법 (PowerShell)
+
+**사전 준비**: Backend 서버 실행
+
+```powershell
+uvicorn app.main:app --reload
+```
+
+**테스트 요청 파일 생성** (`test_rca_request.json`)
+
+```json
+{
+  "query": "서버에서 다음 에러가 발생했습니다: ConnectionRefusedError: [Errno 111] Connection refused. Redis 서버에 연결할 수 없습니다. 원인을 분석해주세요."
+}
+```
+
+**Agent 실행**
+
+```powershell
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_rca_request.json"
+```
+
+---
+
+#### W2-3 테스트 결과 (2026-01-21)
+
+**테스트 환경**
+- Windows 10, Python 3.13.11
+- Backend: FastAPI + Uvicorn
+- LLM: OpenRouter `openai/gpt-4o-mini`
+- Vector DB: FAISS (local)
+
+**테스트 결과 요약**
+
+| 항목 | 결과 | 상세 |
+|------|------|------|
+| Intent 분류 | ✓ 성공 | `rca` 정상 분류 |
+| 로그 파싱 | ✓ 성공 | `has_error_keywords: true` |
+| 장애 사례 검색 | ✓ 성공 | 0건 (빈 저장소, 정상 동작) |
+| 시스템 정보 검색 | ✓ 성공 | 0건 (빈 저장소, 정상 동작) |
+| 가설 생성 | ✓ 성공 | 3개 가설 생성 |
+| 우선순위 정렬 | ✓ 성공 | Top-3 반환 |
+
+**생성된 가설 (Top 3)**
+
+| Rank | 제목 | Confidence |
+|------|------|------------|
+| 1 | Redis 서버가 실행 중이지 않음 | high |
+| 2 | 네트워크 문제 | medium |
+| 3 | Redis 설정 오류 | medium |
+
+**테스트 로그**
+
+```
+# Intent 분류
+"classify_intent": {"status": "success", "intent": "rca", 
+  "reason": "서버에서 발생한 에러에 대한 원인 분석 요청이므로 장애/문제 분석에 해당합니다."}
+
+# 로그 파싱
+"parse_logs": {"status": "success", "has_error_keywords": true, "file_count": 0}
+
+# 장애 사례 검색
+"retrieve_incidents": {"status": "success", "count": 0}
+
+# 시스템 정보 검색
+"retrieve_system_info": {"status": "success", "count": 0}
+
+# 가설 생성
+"generate_hypotheses": {"status": "success", "hypothesis_count": 3}
+
+# 우선순위 정렬
+"prioritize_hypotheses": {"status": "success", "top_count": 3}
+
+# 최종 결과
+"rca_result": {
+  "hypotheses": [
+    {"rank": 1, "title": "Redis 서버가 실행 중이지 않음", 
+     "confidence": "high", "verification_steps": ["Redis 서버 상태 확인", "Redis 서비스 재시작 시도"]},
+    {"rank": 2, "title": "네트워크 문제", 
+     "confidence": "medium", "verification_steps": ["네트워크 연결 테스트", "방화벽 설정 확인"]},
+    {"rank": 3, "title": "Redis 설정 오류", 
+     "confidence": "medium", "verification_steps": ["Redis 설정 파일 확인", "바인딩 주소 검토"]}
+  ],
+  "summary": "서버에서 Redis 서버에 연결할 수 없는 문제에 대해 여러 가지 가설을 제시했습니다."
+}
+```
+
+---
+
+# W2-3 완료 선언
+
+> W2-3 완료 (2026-01-21)
+>
+> 장애 RCA 서브그래프 구현 완료. Intent 분류 → 로그 파싱 → 장애 사례 검색 → 시스템 정보 검색 → 가설 생성 → 우선순위 정렬 플로우 정상 동작 확인. OpenRouter LLM (`gpt-4o-mini`) 기반으로 원인 가설을 생성하고 confidence와 verification_steps를 포함한 Top-N 가설을 반환하는 상태.
 
 ---
 

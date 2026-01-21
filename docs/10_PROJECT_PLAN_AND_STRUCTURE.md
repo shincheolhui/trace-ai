@@ -663,9 +663,122 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 
 **체크리스트**
 
-- [ ] Action Plan 생성
-- [ ] 위험도 부여
-- [ ] 승인 필요 단계 표시
+- [x] Action Plan 생성
+- [x] 위험도 부여
+- [x] 승인 필요 단계 표시
+
+#### W2-4 구현 상세
+
+**구현된 파일:**
+- `app/agent/subgraphs/workflow_graph.py` - Workflow 서브그래프
+- `app/agent/prompts/workflow.md` - Workflow 프롬프트 템플릿
+- `app/agent/orchestrator.py` - Workflow 서브그래프 연결
+
+**Workflow 서브그래프 노드:**
+1. `ANALYZE_REQUEST` - 요청 분석 (action/risk 키워드 감지)
+2. `RETRIEVE_SYSTEM_DOCS` - Knowledge Store에서 시스템 문서 검색
+3. `GENERATE_ACTION_PLAN` - LLM 기반 Action Plan 생성
+4. `ASSESS_RISK` - 위험도 평가 및 승인 필요 여부 결정
+5. `FINALIZE_PLAN` - 최종 계획 정리
+
+**위험도 분류 기준:**
+| 위험도 | 기준 | 승인 |
+|--------|------|------|
+| high | 프로덕션 영향, 데이터 변경 | 필수 |
+| medium | 제한적 영향, 복구 가능 | 권장 |
+| low | 읽기 전용, 테스트 환경 | 불필요 |
+
+---
+
+#### W2-4 테스트 방법
+
+**테스트 데이터 (test_workflow_request.json)**
+
+```json
+{
+  "query": "프로덕션 서버에 새로운 버전을 배포해주세요. 현재 버전은 v1.2.3이고 v1.3.0으로 업그레이드합니다."
+}
+```
+
+**Agent 실행**
+
+```powershell
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_workflow_request.json"
+```
+
+---
+
+#### W2-4 테스트 결과 (2026-01-21)
+
+**테스트 환경**
+- Windows 10, Python 3.13.11
+- Backend: FastAPI + Uvicorn
+- LLM: OpenRouter `openai/gpt-4o-mini`
+- Vector DB: FAISS (local)
+
+**테스트 결과 요약**
+
+| 항목 | 결과 | 상세 |
+|------|------|------|
+| Intent 분류 | ✓ 성공 | `workflow` 정상 분류 |
+| 요청 분석 | ✓ 성공 | `has_action_keywords: true`, `has_risk_keywords: true` |
+| 시스템 문서 검색 | ✓ 성공 | 0건 (빈 저장소, 정상 동작) |
+| Action Plan 생성 | ✓ 성공 | 3단계 계획 생성 |
+| 위험도 평가 | ✓ 성공 | `overall_risk: high` |
+| 승인 필요 여부 | ✓ 성공 | `approval_required: true` |
+
+**생성된 Action Plan**
+
+| Step | 제목 | 위험도 | 승인 | 예상 소요 |
+|------|------|--------|------|-----------|
+| 1 | 현재 버전 백업 | high | 필수 | 1시간 |
+| 2 | v1.3.0 버전 배포 | high | 필수 | 2시간 |
+| 3 | 배포 후 테스트 | medium | 불필요 | 1시간 |
+
+**테스트 로그**
+
+```
+# Intent 분류
+"classify_intent": {"status": "success", "intent": "workflow", 
+  "reason": "사용자가 프로덕션 서버에 새로운 버전을 배포해달라고 요청하고 있습니다."}
+
+# 요청 분석
+"analyze_request": {"status": "success", "has_action_keywords": true, "has_risk_keywords": true}
+
+# 시스템 문서 검색
+"retrieve_system_docs": {"status": "success", "count": 0}
+
+# Action Plan 생성
+"generate_action_plan": {"status": "success", "step_count": 3, "overall_risk": "high", "approval_required": true}
+
+# 위험도 평가
+"assess_risk": {"status": "success", "overall_risk": "high", "high_risk_count": 2, "approval_required": true}
+
+# 계획 최종화
+"finalize_plan": {"status": "success", "final_step_count": 3}
+
+# 최종 결과
+"workflow_result": {
+  "action_plan": [
+    {"step": 1, "title": "현재 버전 백업", "risk_level": "high", "requires_approval": true,
+     "estimated_duration": "1시간", "rollback_plan": "백업 파일을 사용하여 v1.2.3으로 복원"},
+    {"step": 2, "title": "v1.3.0 버전 배포", "risk_level": "high", "requires_approval": true,
+     "estimated_duration": "2시간", "rollback_plan": "v1.2.3 버전으로 롤백"},
+    {"step": 3, "title": "배포 후 테스트", "risk_level": "medium", "requires_approval": false,
+     "estimated_duration": "1시간", "rollback_plan": null}
+  ],
+  "approvals_required": ["현재 버전 백업", "v1.3.0 버전 배포"],
+  "summary": "프로덕션 서버에 v1.3.0 버전을 배포하기 위해 현재 버전 백업, 새로운 버전 배포, 배포 후 테스트의 3단계 계획을 수립했습니다."
+}
+```
+
+---
+
+# W2-4 완료 선언
+
+> W2-4 완료 (2026-01-21)
+>
+> 업무 실행 계획 서브그래프 구현 완료. Intent 분류 → 요청 분석 → 시스템 문서 검색 → Action Plan 생성 → 위험도 평가 → 계획 최종화 플로우 정상 동작 확인. LLM 기반 단계별 실행 계획 생성 및 위험도 자동 분류, 승인 필요 여부 결정 기능 구현.
 
 ---
 

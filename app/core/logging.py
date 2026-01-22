@@ -174,6 +174,23 @@ def log_error(logger: logging.Logger, run_id: str, error_type: str, error_messag
     logger.handle(record)
 
 
+def log_approval(logger: logging.Logger, run_id: str, action: str, status: str, extra: Optional[Dict] = None) -> None:
+    """승인 관련 로그"""
+    record = logger.makeRecord(
+        logger.name, logging.INFO, "", 0,
+        f"[{run_id}] APPROVAL: {action} - {status}",
+        (), None
+    )
+    record.event_type = LogEventType.APPROVAL
+    record.extra_data = {
+        "action": action,
+        "status": status,
+    }
+    if extra:
+        record.extra_data.update(extra)
+    logger.handle(record)
+
+
 # ===== 노드 데코레이터 =====
 P = ParamSpec("P")
 T = TypeVar("T")

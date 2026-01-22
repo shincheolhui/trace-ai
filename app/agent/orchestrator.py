@@ -20,6 +20,7 @@ from app.core.logging import (
     log_decision,
     log_action,
     log_error,
+    log_approval,
 )
 
 logger = get_structured_logger(__name__)
@@ -281,6 +282,102 @@ def mixed_subgraph_node(state: AgentState) -> dict:
     }
 
 
+def check_approval_node(state: AgentState) -> dict:
+    """승인 필요 여부 체크 노드"""
+    run_id = state.run_id
+    log_node_start(logger, run_id, "CHECK_APPROVAL")
+    start_time = time.perf_counter()
+    
+    # 승인 필요 여부 및 사유 수집
+    approval_reasons = []
+    
+    # Workflow 결과에서 승인 필요 항목 확인
+    if state.workflow_result and state.workflow_result.approvals_required:
+        approval_reasons.extend(state.workflow_result.approvals_required)
+    
+    # action_plan에서 high risk 항목 확인
+    if state.action_plan:
+        for step in state.action_plan:
+            if step.get("risk_level") == "high" and step.get("requires_approval"):
+                reason = f"고위험 작업: {step.get('title', 'Unknown')}"
+                if reason not in approval_reasons:
+                    approval_reasons.append(reason)
+    
+    # approval_required 플래그가 이미 설정된 경우
+    approval_required = state.approval_required or len(approval_reasons) > 0
+    
+    if approval_required:
+        log_approval(logger, run_id, "check", "pending", {"reasons": approval_reasons})
+        approval_status = "pending"
+    else:
+        approval_status = "not_required"
+    
+    duration_ms = (time.perf_counter() - start_time) * 1000
+    log_node_end(logger, run_id, "CHECK_APPROVAL", duration_ms, "success", {
+        "approval_required": approval_required,
+        "reasons_count": len(approval_reasons)
+    })
+    
+    return {
+        "approval_required": approval_required,
+        "approval_status": approval_status,
+        "trace": {
+            **state.trace,
+            "check_approval": {
+                "status": "success",
+                "approval_required": approval_required,
+                "approval_reasons": approval_reasons,
+            }
+        }
+    }
+
+
+def route_by_approval(state: AgentState) -> Literal["FINALIZE", "AWAIT_APPROVAL"]:
+    """승인 필요 여부에 따라 라우팅"""
+    run_id = state.run_id
+    
+    if state.approval_required and state.approval_status == "pending":
+        target = "AWAIT_APPROVAL"
+    else:
+        target = "FINALIZE"
+    
+    log_decision(logger, run_id, "approval_routing", target, f"approval_required={state.approval_required}")
+    return target
+
+
+def await_approval_node(state: AgentState) -> dict:
+    """승인 대기 노드 - 상태를 저장하고 대기 상태로 전환"""
+    run_id = state.run_id
+    log_node_start(logger, run_id, "AWAIT_APPROVAL")
+    start_time = time.perf_counter()
+    
+    # 승인 사유 수집
+    approval_reasons = []
+    if state.workflow_result and state.workflow_result.approvals_required:
+        approval_reasons.extend(state.workflow_result.approvals_required)
+    
+    log_approval(logger, run_id, "await", "pending", {
+        "action_plan_count": len(state.action_plan),
+        "reasons": approval_reasons
+    })
+    
+    duration_ms = (time.perf_counter() - start_time) * 1000
+    log_node_end(logger, run_id, "AWAIT_APPROVAL", duration_ms, "pending", {
+        "approval_status": "pending"
+    })
+    
+    return {
+        "approval_status": "pending",
+        "trace": {
+            **state.trace,
+            "await_approval": {
+                "status": "pending",
+                "approval_reasons": approval_reasons,
+            }
+        }
+    }
+
+
 def finalize_node(state: AgentState) -> dict:
     """최종 결과 정리 노드"""
     run_id = state.run_id
@@ -348,12 +445,14 @@ def build_graph():
     graph.add_node("RCA", rca_subgraph_node)
     graph.add_node("WORKFLOW", workflow_subgraph_node)
     graph.add_node("MIXED", mixed_subgraph_node)
+    graph.add_node("CHECK_APPROVAL", check_approval_node)
+    graph.add_node("AWAIT_APPROVAL", await_approval_node)
     graph.add_node("FINALIZE", finalize_node)
     
     # 엣지 연결
     graph.add_edge(START, "CLASSIFY_INTENT")
     
-    # 조건부 라우팅
+    # Intent 기반 조건부 라우팅
     graph.add_conditional_edges(
         "CLASSIFY_INTENT",
         route_by_intent,
@@ -366,11 +465,24 @@ def build_graph():
         }
     )
     
-    # 서브그래프 완료 후 FINALIZE로
-    graph.add_edge("COMPLIANCE", "FINALIZE")
-    graph.add_edge("RCA", "FINALIZE")
-    graph.add_edge("WORKFLOW", "FINALIZE")
-    graph.add_edge("MIXED", "FINALIZE")
+    # 서브그래프 완료 후 승인 체크로
+    graph.add_edge("COMPLIANCE", "CHECK_APPROVAL")
+    graph.add_edge("RCA", "CHECK_APPROVAL")
+    graph.add_edge("WORKFLOW", "CHECK_APPROVAL")
+    graph.add_edge("MIXED", "CHECK_APPROVAL")
+    
+    # 승인 체크 후 조건부 라우팅
+    graph.add_conditional_edges(
+        "CHECK_APPROVAL",
+        route_by_approval,
+        {
+            "FINALIZE": "FINALIZE",
+            "AWAIT_APPROVAL": "AWAIT_APPROVAL",
+        }
+    )
+    
+    # 승인 대기 후 종료 (재개 시 별도 처리)
+    graph.add_edge("AWAIT_APPROVAL", END)
     graph.add_edge("FINALIZE", END)
     
     return graph.compile()

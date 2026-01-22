@@ -1136,15 +1136,211 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 
 ### W3-2 승인(Human-in-the-loop)
 
+**작업 목적**
+
+고위험 작업 실행 전에 Human-in-the-loop 승인 프로세스를 구현. 승인 대기 상태 저장, 승인/거부 API, 승인 후 실행 재개 기능을 제공하여 안전한 자동화를 지원.
+
 **작업 내용**
 
-- 승인 대기 상태
-- 승인 API
-- 승인 후 재개
+- 승인 대기 상태 저장소 구현 (인메모리, MVP용)
+- 오케스트레이터에 승인 체크 노드 추가 (`CHECK_APPROVAL`, `AWAIT_APPROVAL`)
+- 승인 관련 스키마 추가 (`ApprovalRequest`, `ApprovalResponse`, `ApprovalStatusResponse`)
+- 승인 API 엔드포인트 구현 (`POST /approve`, `POST /reject`, `GET /status/{run_id}`, `GET /pending`)
+- Agent 응답에 승인 정보 포함 (`PENDING_APPROVAL` 상태)
+- 승인 후 실행 재개 로직 구현
+
+**구현된 파일**
+
+| 파일 | 설명 |
+|------|------|
+| `app/services/approval_store.py` | 승인 대기 상태 저장소 (PendingApproval 모델, CRUD 함수) |
+| `app/schemas/agent.py` | 승인 관련 스키마 (ApprovalRequest, ApprovalResponse 등) |
+| `app/api/v1/approval.py` | 승인 API 엔드포인트 (4개 엔드포인트) |
+| `app/agent/orchestrator.py` | 승인 체크 노드 추가 (CHECK_APPROVAL, AWAIT_APPROVAL, route_by_approval) |
+| `app/services/agent_service.py` | 승인 대기 상태 저장 및 재개 로직 |
+| `app/core/logging.py` | `log_approval` 함수 추가 |
+
+**오케스트레이터 노드 추가**
+
+| 노드 | 설명 |
+|------|------|
+| `CHECK_APPROVAL` | 승인 필요 여부 체크, 승인 사유 수집 |
+| `AWAIT_APPROVAL` | 승인 대기 상태로 전환, 상태 저장 |
+| `route_by_approval` | 승인 필요 여부에 따른 라우팅 결정 |
+
+**승인 API 엔드포인트**
+
+| 엔드포인트 | 메서드 | 설명 |
+|------------|--------|------|
+| `/api/v1/approval/approve` | POST | 실행 계획 승인 및 재개 |
+| `/api/v1/approval/reject` | POST | 실행 계획 거부 |
+| `/api/v1/approval/status/{run_id}` | GET | 승인 상태 조회 |
+| `/api/v1/approval/pending` | GET | 대기 중인 승인 목록 조회 |
 
 **브랜치**
 
 - `w3-2-approval-flow`
+
+**체크리스트**
+
+- [x] 승인 대기 상태 저장소 구현
+- [x] 승인 관련 스키마 추가
+- [x] 오케스트레이터에 승인 체크 노드 추가
+- [x] 승인 API 엔드포인트 구현
+- [x] agent_service에 승인 대기/재개 로직 추가
+- [x] 구조화 로그에 승인 이벤트 추가
+
+---
+
+#### W3-2 테스트 방법 (PowerShell)
+
+**사전 준비**: Backend 서버 실행
+
+```powershell
+uvicorn app.main:app --reload
+```
+
+**1. Workflow 요청 (승인 필요한 작업)**
+
+```powershell
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_workflow_request.json"
+```
+
+**2. 승인 대기 목록 조회**
+
+```powershell
+curl.exe -X GET "http://localhost:8000/api/v1/approval/pending"
+```
+
+**3. 승인 상태 조회**
+
+```powershell
+curl.exe -X GET "http://localhost:8000/api/v1/approval/status/{run_id}"
+```
+
+**4. 실행 승인**
+
+```powershell
+curl.exe -X POST "http://localhost:8000/api/v1/approval/approve" -H "Content-Type: application/json" -d "@test_approve_request.json"
+```
+
+**5. 실행 거부**
+
+```powershell
+curl.exe -X POST "http://localhost:8000/api/v1/approval/reject" -H "Content-Type: application/json" -d "@test_reject_request.json"
+```
+
+---
+
+#### W3-2 테스트 결과 (2026-01-21)
+
+**테스트 환경**
+- Windows 10, Python 3.13.11
+- Backend: FastAPI + Uvicorn
+- LLM: OpenRouter `openai/gpt-4o-mini`
+
+**테스트 결과 요약**
+
+| 항목 | 결과 | 상세 |
+|------|------|------|
+| Workflow 요청 | ✓ 성공 | `status: "PENDING_APPROVAL"` 정상 반환 |
+| 승인 대기 목록 조회 | ✓ 성공 | 대기 중인 승인 조회 성공 |
+| 승인 상태 조회 | ✓ 성공 | run_id로 상태 조회 성공 |
+| 승인 API | ✓ 성공 | `status: "approved"`, `execution_result` 포함 |
+| 거부 API | ✓ 성공 | `status: "rejected"` 정상 반환 |
+| 승인 후 목록 업데이트 | ✓ 성공 | 승인 후 목록이 0건으로 변경 |
+
+**승인 흐름 추적**
+
+| 단계 | 이벤트 | 상세 |
+|------|--------|------|
+| 1 | Workflow 서브그래프 실행 | action_plan 생성, `approval_required: true` |
+| 2 | **CHECK_APPROVAL** 노드 | 승인 사유 수집 (4개) |
+| 3 | **APPROVAL 로그** | `check - pending` |
+| 4 | **DECISION** | `approval_routing → AWAIT_APPROVAL` |
+| 5 | **AWAIT_APPROVAL** 노드 | 승인 대기 상태로 전환 |
+| 6 | **APPROVAL 로그** | `await - pending` |
+| 7 | 승인 저장 | `approval_store`에 저장 완료 |
+| 8 | 승인 API 호출 | `status: "approved"` |
+| 9 | 실행 재개 | `execution_result` 반환 |
+
+**구조화 로그 출력 예시**
+
+```json
+// CHECK_APPROVAL 노드
+{
+  "timestamp": "2026-01-21T23:51:47.345207+00:00",
+  "level": "INFO",
+  "message": "[6be5d579-...] APPROVAL: check - pending",
+  "event_type": "approval",
+  "data": {
+    "action": "check",
+    "status": "pending",
+    "reasons": ["현재 버전 백업", "새 버전 배포", "고위험 작업: 현재 버전 백업", "고위험 작업: 새 버전 배포"]
+  }
+}
+
+// AWAIT_APPROVAL 노드
+{
+  "timestamp": "2026-01-21T23:51:47.346367+00:00",
+  "level": "INFO",
+  "message": "[6be5d579-...] APPROVAL: await - pending",
+  "event_type": "approval",
+  "data": {
+    "action": "await",
+    "status": "pending",
+    "action_plan_count": 3,
+    "reasons": ["현재 버전 백업", "새 버전 배포"]
+  }
+}
+
+// approval_routing 결정
+{
+  "timestamp": "2026-01-21T23:51:47.345787+00:00",
+  "level": "INFO",
+  "message": "[6be5d579-...] DECISION: approval_routing = AWAIT_APPROVAL",
+  "event_type": "decision",
+  "data": {
+    "decision_type": "approval_routing",
+    "result": "AWAIT_APPROVAL",
+    "reason": "approval_required=True"
+  }
+}
+```
+
+**승인 API 응답 예시**
+
+```json
+// 승인 API 응답
+{
+  "run_id": "2eec0247-879f-4c64-bc33-5f105fafe60d",
+  "status": "approved",
+  "message": "승인 완료. 실행이 재개되었습니다.",
+  "execution_result": {
+    "execution_results": [{
+      "step": "approval_granted",
+      "message": "실행 계획이 승인되었습니다.",
+      "status": "ready_for_execution"
+    }],
+    "approval_status": "approved"
+  }
+}
+
+// 거부 API 응답
+{
+  "run_id": "6be5d579-e1ef-4cd4-a9e0-57d810ececf6",
+  "status": "rejected",
+  "message": "실행이 거부되었습니다."
+}
+```
+
+---
+
+# W3-2 완료 선언
+
+> W3-2 완료 (2026-01-21)
+>
+> 승인(Human-in-the-loop) 시스템 구현 완료. 승인 대기 상태 저장소, 오케스트레이터에 CHECK_APPROVAL/AWAIT_APPROVAL 노드 추가, 승인/거부/상태조회/목록조회 API 엔드포인트 4개 구현. Agent 응답에 PENDING_APPROVAL 상태 및 승인 정보 포함. 승인 후 실행 재개 로직 구현. 구조화 로그로 승인 흐름 전체 추적 가능. Workflow 요청 시 고위험 작업 자동 감지하여 승인 대기 상태로 전환, 승인/거부 API로 처리 가능한 상태.
 
 ---
 

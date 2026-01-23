@@ -218,48 +218,76 @@ class KnowledgeService:
         """지식 저장소 검색"""
         logger.info(f"[knowledge] Search: '{query}' in {store_type.value} (top_k={top_k})")
         
-        # 쿼리 임베딩 생성
-        client = get_openrouter_client()
-        query_embedding = client.create_embedding(query)
-        
-        # 벡터 검색
-        store = get_faiss_store(store_type.value)
-        
-        # 태그 필터 처리 (FAISS는 직접 필터링 불가, 후처리로 해결)
-        search_results = store.search(query_embedding, top_k=top_k * 2 if filter_tags else top_k)
-        
-        results = []
-        for chunk_id, score, metadata in search_results:
-            # 태그 필터링
-            if filter_tags:
-                chunk_tags = metadata.get("tags", [])
-                if not any(tag in chunk_tags for tag in filter_tags):
-                    continue
+        try:
+            # 쿼리 임베딩 생성
+            client = get_openrouter_client()
+            try:
+                query_embedding = client.create_embedding(query)
+            except Exception as e:
+                logger.error(f"[knowledge] Failed to create embedding for query: {e}")
+                # 임베딩 생성 실패 시 빈 결과 반환
+                return SearchResponse(
+                    query=query,
+                    store_type=store_type,
+                    results=[],
+                    total_count=0,
+                )
             
-            results.append(SearchResult(
-                chunk_id=chunk_id,
-                doc_id=metadata.get("doc_id", ""),
-                score=score,
-                text=metadata.get("text", ""),
-                metadata={
-                    "filename": metadata.get("filename", ""),
-                    "tags": metadata.get("tags", []),
-                    "version": metadata.get("version"),
-                    "chunk_index": metadata.get("chunk_index", 0),
-                },
-            ))
+            # 벡터 검색
+            try:
+                store = get_faiss_store(store_type.value)
+                search_results = store.search(query_embedding, top_k=top_k * 2 if filter_tags else top_k)
+            except Exception as e:
+                logger.error(f"[knowledge] Failed to search vector store: {e}")
+                # 검색 실패 시 빈 결과 반환
+                return SearchResponse(
+                    query=query,
+                    store_type=store_type,
+                    results=[],
+                    total_count=0,
+                )
             
-            if len(results) >= top_k:
-                break
-        
-        logger.info(f"[knowledge] Found {len(results)} results for '{query}'")
-        
-        return SearchResponse(
-            query=query,
-            store_type=store_type,
-            results=results,
-            total_count=len(results),
-        )
+            results = []
+            for chunk_id, score, metadata in search_results:
+                # 태그 필터링
+                if filter_tags:
+                    chunk_tags = metadata.get("tags", [])
+                    if not any(tag in chunk_tags for tag in filter_tags):
+                        continue
+                
+                results.append(SearchResult(
+                    chunk_id=chunk_id,
+                    doc_id=metadata.get("doc_id", ""),
+                    score=score,
+                    text=metadata.get("text", ""),
+                    metadata={
+                        "filename": metadata.get("filename", ""),
+                        "tags": metadata.get("tags", []),
+                        "version": metadata.get("version"),
+                        "chunk_index": metadata.get("chunk_index", 0),
+                    },
+                ))
+                
+                if len(results) >= top_k:
+                    break
+            
+            logger.info(f"[knowledge] Found {len(results)} results for '{query}'")
+            
+            return SearchResponse(
+                query=query,
+                store_type=store_type,
+                results=results,
+                total_count=len(results),
+            )
+        except Exception as e:
+            # 예상치 못한 오류 발생 시 빈 결과 반환
+            logger.error(f"[knowledge] Unexpected error during search: {e}", exc_info=True)
+            return SearchResponse(
+                query=query,
+                store_type=store_type,
+                results=[],
+                total_count=0,
+            )
     
     def list_documents(self, store_type: StoreType) -> List[DocumentInfo]:
         """문서 목록 조회"""

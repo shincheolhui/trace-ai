@@ -1,0 +1,23 @@
+{
+  "audit_id": "audit_b5cd9175",
+  "run_id": "32b9552c-fa8a-44e7-8767-b85aa3140005",
+  "user": "system",
+  "started_at": "2026-01-23T11:40:55.076268+00:00",
+  "finished_at": "2026-01-23T11:41:03.335210+00:00",
+  "intent": "unknown",
+  "summary": "unknown 요청 처리 완료",
+  "evidence_refs": [],
+  "approvals": [],
+  "actions_executed": [],
+  "result_status": "FAILED",
+  "analysis_results": {},
+  "errors": [
+    "Intent 분류 실패: RetryError[<Future at 0x1917f721450 state=finished raised APIConnectionError>]"
+  ],
+  "trace_summary": {
+    "intent_classified": false,
+    "subgraphs_executed": [],
+    "approval_checked": false,
+    "finalized": false
+  }
+}

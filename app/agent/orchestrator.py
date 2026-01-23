@@ -460,7 +460,10 @@ def finalize_node(state: AgentState) -> dict:
         
     except Exception as e:
         log_error(logger, run_id, "AuditGenerationError", str(e), "FINALIZE")
-        # 감사 생성 실패해도 계속 진행
+        # 감사 생성 실패 시 오류를 state.errors에 기록하여 다음 시도 시 포함되도록 함
+        # (현재는 finalize_node이므로 다음 노드가 없지만, 오류 추적을 위해 기록)
+        analysis_results["_audit_error"] = f"감사 생성 실패: {str(e)}"
+        # 감사 생성 실패해도 계속 진행 (END 상태 도달 보장)
     
     duration_ms = (time.perf_counter() - start_time) * 1000
     log_node_end(logger, run_id, "FINALIZE", duration_ms, "success", {"intent": state.intent})

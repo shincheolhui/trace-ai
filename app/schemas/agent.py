@@ -55,3 +55,35 @@ class PendingApprovalListResponse(BaseModel):
     """대기 중인 승인 목록 응답"""
     count: int
     pending_approvals: List[ApprovalStatusResponse] = Field(default_factory=list)
+
+
+# ===== 감사 관련 스키마 =====
+
+class ApprovalRecord(BaseModel):
+    """승인 내역"""
+    run_id: str
+    status: Literal["pending", "approved", "rejected"]
+    approved_by: Optional[str] = None
+    note: Optional[str] = None
+    created_at: Optional[str] = None
+    resolved_at: Optional[str] = None
+
+
+class AuditSummary(BaseModel):
+    """감사 요약"""
+    audit_id: str
+    run_id: str
+    user: str = "system"  # MVP에서는 기본값 사용
+    started_at: str
+    finished_at: str
+    intent: Literal["compliance", "rca", "workflow", "mixed", "unknown"]
+    summary: str
+    evidence_refs: List[Dict[str, Any]] = Field(default_factory=list)
+    approvals: List[ApprovalRecord] = Field(default_factory=list)
+    actions_executed: List[Dict[str, Any]] = Field(default_factory=list)
+    result_status: Literal["SUCCESS", "PARTIAL", "FAILED"]
+    
+    # 추가 정보
+    analysis_results: Dict[str, Any] = Field(default_factory=dict)
+    errors: List[str] = Field(default_factory=list)
+    trace_summary: Dict[str, Any] = Field(default_factory=dict)

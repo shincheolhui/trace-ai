@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from app.agent.orchestrator import get_graph
@@ -18,16 +19,27 @@ def run_agent(query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str,
     if not run_id:
         # W1-2 전제상 발생하면 안되지만, 안전망
         run_id = "UNKNOWN"
+    
+    # 시작 시간 기록
+    started_at = datetime.now(timezone.utc)
+    
+    # context에 시작 시간 추가
+    if context is None:
+        context = {}
+    context["_started_at"] = started_at.isoformat()
 
     state = AgentState(
         run_id=run_id,
         user_input=query,
-        context=context or {},
+        context=context,
     )
 
     logger.info(f"[agent_service] invoke graph run_id={run_id}")
     graph = get_graph()
     result = graph.invoke(state)
+    
+    # 결과에 시작 시간 추가 (감사 생성용)
+    result["_started_at"] = started_at.isoformat()
     
     # 승인 대기 상태인 경우 상태 저장
     if result.get("approval_status") == "pending":

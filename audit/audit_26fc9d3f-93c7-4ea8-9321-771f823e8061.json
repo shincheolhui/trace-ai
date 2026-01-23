@@ -1,0 +1,30 @@
+{
+  "audit_id": "audit_64a151a8",
+  "run_id": "26fc9d3f-93c7-4ea8-9321-771f823e8061",
+  "user": "system",
+  "started_at": "2026-01-23T11:27:12.416425+00:00",
+  "finished_at": "2026-01-23T11:27:16.421348+00:00",
+  "intent": "compliance",
+  "summary": "[규정검사] 관련 규정이 없어 위반 여부를 판단할 수 없습니다.",
+  "evidence_refs": [],
+  "approvals": [],
+  "actions_executed": [],
+  "result_status": "SUCCESS",
+  "analysis_results": {
+    "compliance": {
+      "status": "no_violation",
+      "violations": [],
+      "recommendations": [
+        "관련 규정을 찾지 못했습니다. 담당자에게 문의하세요."
+      ],
+      "summary": "관련 규정이 없어 위반 여부를 판단할 수 없습니다."
+    }
+  },
+  "errors": [],
+  "trace_summary": {
+    "intent_classified": true,
+    "subgraphs_executed": [],
+    "approval_checked": true,
+    "finalized": false
+  }
+}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Literal
 
@@ -22,6 +23,7 @@ from app.core.logging import (
     log_error,
     log_approval,
 )
+from app.services.audit_service import create_audit_summary, save_audit_summary
 
 logger = get_structured_logger(__name__)
 
@@ -420,6 +422,45 @@ def finalize_node(state: AgentState) -> dict:
         
         if summaries:
             analysis_results["integrated_summary"] = " | ".join(summaries)
+    
+    # 감사 요약 생성
+    try:
+        # 시작 시간 추출 (context 또는 state에서)
+        started_at_str = state.context.get("_started_at")
+        if started_at_str:
+            started_at = datetime.fromisoformat(started_at_str.replace("Z", "+00:00"))
+        else:
+            # 기본값: 현재 시간에서 1분 전 (대략적인 추정)
+            started_at = datetime.now(timezone.utc)
+        
+        finished_at = datetime.now(timezone.utc)
+        
+        # State를 dict로 변환
+        state_dict = state.model_dump()
+        state_dict["analysis_results"] = analysis_results
+        
+        # 감사 요약 생성
+        audit = create_audit_summary(
+            run_id=run_id,
+            state=state_dict,
+            started_at=started_at,
+            finished_at=finished_at,
+        )
+        
+        # 감사 저장
+        audit_filepath = save_audit_summary(audit)
+        
+        log_action(logger, run_id, "audit_generated", f"감사 요약 생성 및 저장: {audit_filepath}", {
+            "audit_id": audit.audit_id,
+            "result_status": audit.result_status,
+        })
+        
+        # 결과에 감사 ID 추가
+        analysis_results["_audit_id"] = audit.audit_id
+        
+    except Exception as e:
+        log_error(logger, run_id, "AuditGenerationError", str(e), "FINALIZE")
+        # 감사 생성 실패해도 계속 진행
     
     duration_ms = (time.perf_counter() - start_time) * 1000
     log_node_end(logger, run_id, "FINALIZE", duration_ms, "success", {"intent": state.intent})

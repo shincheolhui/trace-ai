@@ -1346,14 +1346,224 @@ curl.exe -X POST "http://localhost:8000/api/v1/approval/reject" -H "Content-Type
 
 ### W3-3 감사(Audit) 요약 생성
 
+**작업 목적**
+
+각 Agent 실행(run)에 대한 불변의 감사 요약을 생성하여 판단·근거·승인·실행 내역을 영구 보관. 실행 완료 시 자동으로 JSON 파일로 저장하고, API를 통해 조회 가능하도록 구현.
+
 **작업 내용**
 
-- run 단위 감사 JSON
-- 판단·근거·승인·실행 포함
+- 감사 요약 스키마 정의 (`AuditSummary`, `ApprovalRecord`)
+- 감사 생성 서비스 구현 (`create_audit_summary`, `save_audit_summary`, `get_audit_summary`)
+- 실행 시작/종료 시간 기록 (`started_at`, `finished_at`)
+- finalize_node에 감사 생성 통합
+- 감사 조회 API 엔드포인트 구현 (`GET /runs/{run_id}/audit`)
+
+**구현된 파일**
+
+| 파일 | 설명 |
+|------|------|
+| `app/schemas/agent.py` | 감사 관련 스키마 (ApprovalRecord, AuditSummary) |
+| `app/services/audit_service.py` | 감사 요약 생성 및 저장 서비스 |
+| `app/services/agent_service.py` | 실행 시작 시간 기록 |
+| `app/agent/orchestrator.py` | finalize_node에 감사 생성 통합 |
+| `app/api/v1/runs.py` | 감사 조회 API 엔드포인트 |
+| `app/main.py` | runs_router 등록 |
+
+**감사 요약 스키마 (`AuditSummary`)**
+
+| 필드 | 설명 |
+|------|------|
+| `audit_id` | 감사 ID (고유 식별자) |
+| `run_id` | 실행 ID |
+| `started_at` | 실행 시작 시간 (ISO 8601) |
+| `finished_at` | 실행 종료 시간 (ISO 8601) |
+| `intent` | 의도 분류 (compliance, rca, workflow, mixed, unknown) |
+| `summary` | 실행 요약 |
+| `evidence_refs` | 근거 참조 목록 (최대 10개) |
+| `approvals` | 승인 내역 목록 |
+| `actions_executed` | 실행된 액션 목록 |
+| `result_status` | 결과 상태 (SUCCESS, PARTIAL, FAILED) |
+| `analysis_results` | 분석 결과 (compliance, rca, workflow) |
+| `errors` | 오류 목록 |
+| `trace_summary` | 실행 추적 요약 |
+
+**감사 서비스 함수**
+
+| 함수 | 설명 |
+|------|------|
+| `create_audit_summary(run_id, state, started_at, finished_at)` | State에서 감사 요약 생성 |
+| `save_audit_summary(audit)` | JSON 파일로 저장 (`audit/audit_{run_id}.json`) |
+| `get_audit_summary(run_id)` | 감사 요약 조회 |
 
 **브랜치**
 
 - `w3-3-audit-summary`
+
+**체크리스트**
+
+- [x] 감사 요약 스키마 정의
+- [x] 감사 생성 서비스 구현
+- [x] 실행 시작/종료 시간 기록
+- [x] finalize_node에 감사 생성 통합
+- [x] 감사 조회 API 엔드포인트 구현
+- [x] 감사 파일 저장 확인
+
+---
+
+#### W3-3 테스트 방법 (PowerShell)
+
+**사전 준비**: Backend 서버 실행
+
+```powershell
+uvicorn app.main:app --reload
+```
+
+**1. Agent 실행 (어떤 요청이든 가능)**
+
+```powershell
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_request.json"
+```
+
+**2. 감사 요약 조회 (응답의 run_id 사용)**
+
+```powershell
+curl.exe -X GET "http://localhost:8000/api/v1/runs/{run_id}/audit"
+```
+
+**3. 감사 파일 확인**
+
+```powershell
+# audit 디렉터리에 JSON 파일 생성됨
+dir audit
+```
+
+---
+
+#### W3-3 테스트 결과 (2026-01-23)
+
+**테스트 환경**
+- Windows 10, Python 3.13.11
+- Backend: FastAPI + Uvicorn
+- LLM: OpenRouter `openai/gpt-4o-mini`
+
+**테스트 결과 요약**
+
+| 항목 | 결과 | 상세 |
+|------|------|------|
+| Agent 실행 | ✓ 성공 | `status: "COMPLETED"` 정상 반환 |
+| 감사 요약 생성 | ✓ 성공 | `audit_id: "audit_64a151a8"` 생성 |
+| 감사 파일 저장 | ✓ 성공 | `audit/audit_26fc9d3f-93c7-4ea8-9321-771f823e8061.json` 저장 |
+| 감사 조회 API | ✓ 성공 | `GET /runs/{run_id}/audit` 정상 조회 |
+| 실행 시간 기록 | ✓ 성공 | `started_at`, `finished_at` 정확히 기록 |
+| 구조화 로그 | ✓ 성공 | `audit_generated` 액션 로그 기록 |
+
+**생성된 감사 요약 예시**
+
+```json
+{
+  "audit_id": "audit_64a151a8",
+  "run_id": "26fc9d3f-93c7-4ea8-9321-771f823e8061",
+  "user": "system",
+  "started_at": "2026-01-23T11:27:12.416425+00:00",
+  "finished_at": "2026-01-23T11:27:16.421348+00:00",
+  "intent": "compliance",
+  "summary": "[규정검사] 관련 규정이 없어 위반 여부를 판단할 수 없습니다.",
+  "evidence_refs": [],
+  "approvals": [],
+  "actions_executed": [],
+  "result_status": "SUCCESS",
+  "analysis_results": {
+    "compliance": {
+      "status": "no_violation",
+      "violations": [],
+      "recommendations": ["관련 규정을 찾지 못했습니다. 담당자에게 문의하세요."],
+      "summary": "관련 규정이 없어 위반 여부를 판단할 수 없습니다."
+    }
+  },
+  "errors": [],
+  "trace_summary": {
+    "intent_classified": true,
+    "subgraphs_executed": [],
+    "approval_checked": true,
+    "finalized": false
+  }
+}
+```
+
+**실행 흐름 추적**
+
+| 단계 | 시간 | 이벤트 | 상세 |
+|------|------|--------|------|
+| 1 | 11:27:12.416 | Agent 실행 시작 | `started_at` 기록 |
+| 2 | 11:27:14.382 | **DECISION** | routing → `COMPLIANCE` |
+| 3 | 11:27:14.382 | **Node START** | `COMPLIANCE_SUBGRAPH` |
+| 4 | 11:27:16.419 | **Node END** | `COMPLIANCE_SUBGRAPH` (2036.32ms) |
+| 5 | 11:27:16.420 | **Node START** | `CHECK_APPROVAL` |
+| 6 | 11:27:16.420 | **DECISION** | approval_routing → `FINALIZE` |
+| 7 | 11:27:16.421 | **Node START** | `FINALIZE` |
+| 8 | 11:27:16.421 | **감사 생성** | `audit_id: audit_64a151a8` |
+| 9 | 11:27:16.423 | **감사 저장** | JSON 파일 저장 완료 |
+| 10 | 11:27:16.423 | **ACTION** | `audit_generated` |
+| 11 | 11:27:16.423 | **Node END** | `FINALIZE` (2.37ms) |
+| 12 | 11:28:26.297 | **감사 조회** | API 호출 성공 |
+
+**구조화 로그 출력 예시**
+
+```json
+// 감사 생성 로그
+{
+  "timestamp": "2026-01-23T11:27:16.421459+00:00",
+  "level": "INFO",
+  "message": "[audit_service] Generated audit summary: audit_id=audit_64a151a8, run_id=26fc9d3f-93c7-4ea8-9321-771f823e8061",
+  "run_id": "26fc9d3f-93c7-4ea8-9321-771f823e8061"
+}
+
+// 감사 저장 로그
+{
+  "timestamp": "2026-01-23T11:27:16.423275+00:00",
+  "level": "INFO",
+  "message": "[audit_service] Saved audit summary: audit\\audit_26fc9d3f-93c7-4ea8-9321-771f823e8061.json",
+  "run_id": "26fc9d3f-93c7-4ea8-9321-771f823e8061"
+}
+
+// 감사 생성 액션 로그
+{
+  "timestamp": "2026-01-23T11:27:16.423493+00:00",
+  "level": "INFO",
+  "message": "[26fc9d3f-93c7-4ea8-9321-771f823e8061] ACTION: audit_generated - 감사 요약 생성 및 저장: audit\\audit_26fc9d3f-93c7-4ea8-9321-771f823e8061.json",
+  "run_id": "26fc9d3f-93c7-4ea8-9321-771f823e8061",
+  "event_type": "action",
+  "data": {
+    "action_type": "audit_generated",
+    "description": "감사 요약 생성 및 저장: audit\\audit_26fc9d3f-93c7-4ea8-9321-771f823e8061.json",
+    "audit_id": "audit_64a151a8",
+    "result_status": "SUCCESS"
+  }
+}
+```
+
+**Agent 응답에 감사 ID 포함**
+
+```json
+{
+  "run_id": "26fc9d3f-93c7-4ea8-9321-771f823e8061",
+  "status": "COMPLETED",
+  "result": {
+    "analysis_results": {
+      "compliance": {...},
+      "_audit_id": "audit_64a151a8"
+    }
+  }
+}
+```
+
+---
+
+# W3-3 완료 선언
+
+> W3-3 완료 (2026-01-23)
+>
+> 감사(Audit) 요약 생성 시스템 구현 완료. `AuditSummary` 스키마 정의, `audit_service.py`에서 감사 요약 생성 및 저장 기능 구현, `agent_service.py`에서 실행 시작 시간 기록, `orchestrator.py`의 `finalize_node`에 감사 생성 통합, `runs.py`에 감사 조회 API 엔드포인트 구현. 실행 완료 시 자동으로 `audit/audit_{run_id}.json` 파일로 저장되며, API를 통해 조회 가능. 판단·근거·승인·실행 내역을 포함한 불변의 감사 요약이 생성되어 영구 보관 가능한 상태.
 
 ---
 

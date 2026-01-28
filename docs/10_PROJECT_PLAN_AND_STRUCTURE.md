@@ -1774,6 +1774,29 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 
 - `w3-5-demo-rehearsal`
 
+**실행 결과 (2026-01-26)**
+
+| 단계 | 결과 | 상세 |
+|------|------|------|
+| Step 1 Backend 확인 | ✓ 성공 | health 정상 |
+| Step 2 문서 시드 | ✓ 성공 | Policy/Incident/System 각 `completed`, chunk 적재 |
+| Step 3 Agent Run (1차) | ⚠ 부분 | `intent: unknown` → 서브그래프 미실행 (PowerShell 인코딩 이슈) |
+| Step 3 Agent Run (재실행) | ✓ 성공 | `intent: mixed`, Compliance→RCA→Workflow 전부 실행, `status: PENDING_APPROVAL` |
+
+- **1차 원인**: `run_full_demo_scenario.ps1`에서 PowerShell `ConvertTo-Json` + `Out-File -Encoding UTF8`로 생성한 JSON 한글 깨짐 → `unknown` 분류.
+- **조치**: 스크립트를 `demo_request_mixed.json` 직접 사용으로 수정 후 재실행.
+- **재실행 결과**: `classify_intent` → `mixed_compliance` → `mixed_rca` → `mixed_workflow` → `mixed_summary` → `check_approval` → `await_approval` 정상 흐름. Compliance `no_violation`, RCA 가설 3건(Redis 서버 미기동 / 네트워크 / 설정 오류), Workflow 3단계 Action Plan 및 고위험 단계 승인 대기.
+
+**참고**: `docs/W3-5_DEMO_REHEARSAL_GUIDE.md`, `scripts/run_full_demo_scenario.ps1`, `demo_request_mixed.json`, `demo_docs/` 활용.
+
+---
+
+# W3-5 완료 선언
+
+> W3-5 완료 (2026-01-26)
+>
+> 데모 리허설 1차 수행 완료. `scripts/seed_demo_docs.ps1`으로 `demo_docs/`(policy_security_password, incident_redis_connection, system_deployment_procedure) 지식 저장소 적재, `run_full_demo_scenario.ps1`으로 전체 시나리오(시드 → Agent Run) 1회 실행. 1차 실행 시 PowerShell 인코딩 이슈로 intent `unknown` → 스크립트를 `demo_request_mixed.json` 직접 사용으로 수정. 재실행에서 Mixed(Compliance→RCA→Workflow) 전체 흐름 검증 완료: intent `mixed` 분류, 3개 서브그래프 순차 실행, 통합 요약 생성, 고위험 단계 승인 대기(`PENDING_APPROVAL`) 정상 동작 확인.
+
 ---
 
 # WEEK 4 — 데모 완성 & 정리

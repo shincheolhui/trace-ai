@@ -17,7 +17,7 @@ $policyResponse = curl.exe -X POST "$baseUrl/api/v1/admin/knowledge-store/ingest
   -H "X-Admin-Token: $adminToken" `
   -F "store_type=policy" `
   -F "tags=security,password,compliance" `
-  -F "files=@demo_docs/policy_security_password.txt"
+  -F "files=@demo/demo_docs/policy_security_password.txt"
 
 Write-Host $policyResponse
 Write-Host ""
@@ -28,7 +28,7 @@ $incidentResponse = curl.exe -X POST "$baseUrl/api/v1/admin/knowledge-store/inge
   -H "X-Admin-Token: $adminToken" `
   -F "store_type=incident" `
   -F "tags=redis,connection,error" `
-  -F "files=@demo_docs/incident_redis_connection.txt"
+  -F "files=@demo/demo_docs/incident_redis_connection.txt"
 
 Write-Host $incidentResponse
 Write-Host ""
@@ -39,7 +39,7 @@ $systemResponse = curl.exe -X POST "$baseUrl/api/v1/admin/knowledge-store/ingest
   -H "X-Admin-Token: $adminToken" `
   -F "store_type=system" `
   -F "tags=deployment,procedure,production" `
-  -F "files=@demo_docs/system_deployment_procedure.txt"
+  -F "files=@demo/demo_docs/system_deployment_procedure.txt"
 
 Write-Host $systemResponse
 Write-Host ""

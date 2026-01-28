@@ -1,0 +1,21 @@
+{
+  "audit_id": "audit_4a8015f6",
+  "run_id": "aa76a94b-a20a-4d9c-a11a-0626a9b5e9e9",
+  "user": "system",
+  "started_at": "2026-01-26T23:32:44.367615+00:00",
+  "finished_at": "2026-01-26T23:32:45.469081+00:00",
+  "intent": "unknown",
+  "summary": "unknown 요청 처리 완료",
+  "evidence_refs": [],
+  "approvals": [],
+  "actions_executed": [],
+  "result_status": "SUCCESS",
+  "analysis_results": {},
+  "errors": [],
+  "trace_summary": {
+    "intent_classified": true,
+    "subgraphs_executed": [],
+    "approval_checked": false,
+    "finalized": false
+  }
+}

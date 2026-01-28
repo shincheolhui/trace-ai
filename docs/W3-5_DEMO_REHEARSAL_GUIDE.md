@@ -52,9 +52,9 @@ uvicorn app.main:app --reload
 ```
 
 이 스크립트는 다음 문서들을 지식 저장소에 업로드합니다:
-- `demo_docs/policy_security_password.txt` → Policy Store
-- `demo_docs/incident_redis_connection.txt` → Incident Store
-- `demo_docs/system_deployment_procedure.txt` → System Store
+- `demo/demo_docs/policy_security_password.txt` → Policy Store
+- `demo/demo_docs/incident_redis_connection.txt` → Incident Store
+- `demo/demo_docs/system_deployment_procedure.txt` → System Store
 
 #### Step 2: Agent Run 실행
 
@@ -63,7 +63,7 @@ Mixed Intent 시나리오를 실행합니다 (Compliance + RCA + Workflow 모두
 ```powershell
 curl.exe -X POST "http://localhost:8000/api/v1/agent/run" `
     -H "Content-Type: application/json" `
-    -d "@demo_request_mixed.json"
+    -d "@demo/demo_request_mixed.json"
 ```
 
 또는 직접 JSON을 작성하여 실행:
@@ -162,7 +162,7 @@ curl.exe -X GET "http://localhost:8000/api/v1/runs/{run_id}/audit"
 - 로그에서 오류 메시지 확인
 
 ### 문서 시드 실패
-- `demo_docs/` 디렉터리가 프로젝트 루트에 있는지 확인
+- `demo/demo_docs/` 디렉터리가 있는지 확인
 - 세 파일이 모두 존재하는지 확인:
   - `policy_security_password.txt`
   - `incident_redis_connection.txt`
@@ -179,7 +179,7 @@ curl.exe -X GET "http://localhost:8000/api/v1/runs/{run_id}/audit"
 - 응답의 `errors` 필드 확인
 
 ### intent가 `unknown`으로 나오는 경우
-- 한글 query가 깨져 전달되었을 수 있음. `run_full_demo_scenario.ps1`은 `demo_request_mixed.json`을 직접 사용하도록 되어 있어 인코딩 이슈를 피함. 수동 실행 시에도 `-d "@demo_request_mixed.json"` 형태로 JSON 파일 직접 전달을 권장.
+- 한글 query가 깨져 전달되었을 수 있음. `run_full_demo_scenario.ps1`은 `demo/demo_request_mixed.json`을 직접 사용하도록 되어 있어 인코딩 이슈를 피함. 수동 실행 시에도 `-d "@demo/demo_request_mixed.json"` 형태로 JSON 파일 직접 전달을 권장.
 
 ---
 
@@ -187,8 +187,8 @@ curl.exe -X GET "http://localhost:8000/api/v1/runs/{run_id}/audit"
 
 - `scripts/seed_demo_docs.ps1`: 데모 문서 시드 스크립트
 - `scripts/run_full_demo_scenario.ps1`: 전체 시나리오 자동 실행 스크립트
-- `demo_request_mixed.json`: Mixed Intent 요청 예시
-- `demo_docs/`: 데모 문서 디렉터리
+- `demo/demo_request_mixed.json`: Mixed Intent 요청 예시
+- `demo/demo_docs/`: 데모 문서 디렉터리
   - `policy_security_password.txt`
   - `incident_redis_connection.txt`
   - `system_deployment_procedure.txt`

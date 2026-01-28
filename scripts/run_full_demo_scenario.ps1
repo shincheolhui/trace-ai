@@ -57,13 +57,13 @@ Write-Host "[Step 3/3] Executing Agent Run (Mixed Intent)..." -ForegroundColor Y
 Write-Host ""
 
 # Use demo_request_mixed.json directly (avoid PowerShell encoding issues)
-$jsonPath = Join-Path $projectRoot "demo_request_mixed.json"
+$jsonPath = Join-Path $projectRoot "demo\demo_request_mixed.json"
 if (-not (Test-Path $jsonPath)) {
-    Write-Host "ERROR: demo_request_mixed.json not found." -ForegroundColor Red
+    Write-Host "ERROR: demo\demo_request_mixed.json not found." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "Request file: demo_request_mixed.json" -ForegroundColor Cyan
+Write-Host "Request file: demo\demo_request_mixed.json" -ForegroundColor Cyan
 Get-Content $jsonPath -Raw -Encoding UTF8 | Write-Host
 Write-Host ""
 

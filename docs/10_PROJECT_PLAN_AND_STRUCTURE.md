@@ -291,7 +291,7 @@ curl.exe -X POST "http://127.0.0.1:8000/api/v1/admin/knowledge-store/ingest" `
   -H "X-Admin-Token: dev-admin-token" `
   -F "store_type=policy" `
   -F "tags=security,password" `
-  -F "files=@test_policy.txt"
+  -F "files=@scripts/fixtures/test_policy.txt"
 ```
 
 **2. 저장소 통계 조회 (Stats)**
@@ -340,7 +340,7 @@ curl.exe -X DELETE "http://127.0.0.1:8000/api/v1/admin/knowledge-store/docs/{doc
 |-----|------|------|
 | Ingest (적재) | ✓ 성공 | `status: completed`, 1개 청크 생성 |
 | Stats (통계) | ✓ 성공 | 문서 1개, 청크 1개 확인 |
-| Docs (목록) | ✓ 성공 | `test_policy.txt`, 태그 `[security, password]` |
+| Docs (목록) | ✓ 성공 | `scripts/fixtures/test_policy.txt`, 태그 `[security, password]` |
 | Search (검색) | ✓ 성공 | "비밀번호 규칙" 검색 → score 0.686 매칭 |
 | Delete (삭제) | ✓ 성공 | 문서 삭제 완료 |
 
@@ -356,7 +356,7 @@ curl.exe -X DELETE "http://127.0.0.1:8000/api/v1/admin/knowledge-store/docs/{doc
 
 # 3. 문서 목록
 {"store_type":"policy","documents":[{"doc_id":"c020cea0-...",
- "filename":"test_policy.txt","status":"completed","chunk_count":1,
+ "filename":"scripts/fixtures/test_policy.txt","status":"completed","chunk_count":1,
  "tags":["security","password"],...}],"total_count":1}
 
 # 4. 검색 결과
@@ -436,7 +436,7 @@ curl.exe -X DELETE "http://127.0.0.1:8000/api/v1/admin/knowledge-store/docs/{doc
 uvicorn app.main:app --reload
 ```
 
-**테스트 요청 파일 생성** (`test_request.json`)
+**테스트 요청 파일 생성** (`scripts/fixtures/test_request.json`)
 
 ```json
 {
@@ -447,7 +447,7 @@ uvicorn app.main:app --reload
 **Agent 실행**
 
 ```powershell
-curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_request.json"
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@scripts/fixtures/test_request.json"
 ```
 
 ---
@@ -555,7 +555,7 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 uvicorn app.main:app --reload
 ```
 
-**테스트 요청 파일 생성** (`test_rca_request.json`)
+**테스트 요청 파일 생성** (`scripts/fixtures/test_rca_request.json`)
 
 ```json
 {
@@ -566,7 +566,7 @@ uvicorn app.main:app --reload
 **Agent 실행**
 
 ```powershell
-curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_rca_request.json"
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@scripts/fixtures/test_rca_request.json"
 ```
 
 ---
@@ -692,7 +692,7 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 
 #### W2-4 테스트 방법
 
-**테스트 데이터 (test_workflow_request.json)**
+**테스트 데이터 (scripts/fixtures/test_workflow_request.json)**
 
 ```json
 {
@@ -703,7 +703,7 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 **Agent 실행**
 
 ```powershell
-curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_workflow_request.json"
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@scripts/fixtures/test_workflow_request.json"
 ```
 
 ---
@@ -831,7 +831,7 @@ FINALIZE (통합 요약 생성)
 
 #### W2-5 테스트 방법
 
-**테스트 데이터 (test_mixed_request.json)**
+**테스트 데이터 (scripts/fixtures/test_mixed_request.json)**
 
 ```json
 {
@@ -842,7 +842,7 @@ FINALIZE (통합 요약 생성)
 **Agent 실행**
 
 ```powershell
-curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_mixed_request.json"
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@scripts/fixtures/test_mixed_request.json"
 ```
 
 ---
@@ -1027,7 +1027,7 @@ Agent 실행 과정을 추적 가능한 형태로 로깅. 노드 시작/종료, 
 uvicorn app.main:app --reload
 ```
 
-**테스트 요청 파일** (`test_request.json`)
+**테스트 요청 파일** (`scripts/fixtures/test_request.json`)
 
 ```json
 {
@@ -1038,7 +1038,7 @@ uvicorn app.main:app --reload
 **Agent 실행**
 
 ```powershell
-curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_request.json"
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@scripts/fixtures/test_request.json"
 ```
 
 ---
@@ -1203,7 +1203,7 @@ uvicorn app.main:app --reload
 **1. Workflow 요청 (승인 필요한 작업)**
 
 ```powershell
-curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_workflow_request.json"
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@scripts/fixtures/test_workflow_request.json"
 ```
 
 **2. 승인 대기 목록 조회**
@@ -1221,13 +1221,13 @@ curl.exe -X GET "http://localhost:8000/api/v1/approval/status/{run_id}"
 **4. 실행 승인**
 
 ```powershell
-curl.exe -X POST "http://localhost:8000/api/v1/approval/approve" -H "Content-Type: application/json" -d "@test_approve_request.json"
+curl.exe -X POST "http://localhost:8000/api/v1/approval/approve" -H "Content-Type: application/json" -d "@scripts/fixtures/test_approve_request.json"
 ```
 
 **5. 실행 거부**
 
 ```powershell
-curl.exe -X POST "http://localhost:8000/api/v1/approval/reject" -H "Content-Type: application/json" -d "@test_reject_request.json"
+curl.exe -X POST "http://localhost:8000/api/v1/approval/reject" -H "Content-Type: application/json" -d "@scripts/fixtures/test_reject_request.json"
 ```
 
 ---
@@ -1421,7 +1421,7 @@ uvicorn app.main:app --reload
 **1. Agent 실행 (어떤 요청이든 가능)**
 
 ```powershell
-curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_request.json"
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@scripts/fixtures/test_request.json"
 ```
 
 **2. 감사 요약 조회 (응답의 run_id 사용)**
@@ -1627,7 +1627,7 @@ uvicorn app.main:app --reload
 **1. 정상 실행 테스트**
 
 ```powershell
-curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@test_request.json"
+curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: application/json" -d "@scripts/fixtures/test_request.json"
 ```
 
 **2. 오류 발생 시 감사 생성 확인**
@@ -1784,10 +1784,10 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 | Step 3 Agent Run (재실행) | ✓ 성공 | `intent: mixed`, Compliance→RCA→Workflow 전부 실행, `status: PENDING_APPROVAL` |
 
 - **1차 원인**: `run_full_demo_scenario.ps1`에서 PowerShell `ConvertTo-Json` + `Out-File -Encoding UTF8`로 생성한 JSON 한글 깨짐 → `unknown` 분류.
-- **조치**: 스크립트를 `demo_request_mixed.json` 직접 사용으로 수정 후 재실행.
+- **조치**: 스크립트를 `demo/demo_request_mixed.json` 직접 사용으로 수정 후 재실행.
 - **재실행 결과**: `classify_intent` → `mixed_compliance` → `mixed_rca` → `mixed_workflow` → `mixed_summary` → `check_approval` → `await_approval` 정상 흐름. Compliance `no_violation`, RCA 가설 3건(Redis 서버 미기동 / 네트워크 / 설정 오류), Workflow 3단계 Action Plan 및 고위험 단계 승인 대기.
 
-**참고**: `docs/W3-5_DEMO_REHEARSAL_GUIDE.md`, `scripts/run_full_demo_scenario.ps1`, `demo_request_mixed.json`, `demo_docs/` 활용.
+**참고**: `docs/W3-5_DEMO_REHEARSAL_GUIDE.md`, `scripts/run_full_demo_scenario.ps1`, `demo/demo_request_mixed.json`, `demo/demo_docs/` 활용.
 
 ---
 
@@ -1795,7 +1795,7 @@ curl.exe -X POST "http://localhost:8000/api/v1/agent/run" -H "Content-Type: appl
 
 > W3-5 완료 (2026-01-26)
 >
-> 데모 리허설 1차 수행 완료. `scripts/seed_demo_docs.ps1`으로 `demo_docs/`(policy_security_password, incident_redis_connection, system_deployment_procedure) 지식 저장소 적재, `run_full_demo_scenario.ps1`으로 전체 시나리오(시드 → Agent Run) 1회 실행. 1차 실행 시 PowerShell 인코딩 이슈로 intent `unknown` → 스크립트를 `demo_request_mixed.json` 직접 사용으로 수정. 재실행에서 Mixed(Compliance→RCA→Workflow) 전체 흐름 검증 완료: intent `mixed` 분류, 3개 서브그래프 순차 실행, 통합 요약 생성, 고위험 단계 승인 대기(`PENDING_APPROVAL`) 정상 동작 확인.
+> 데모 리허설 1차 수행 완료. `scripts/seed_demo_docs.ps1`으로 `demo/demo_docs/`(policy_security_password, incident_redis_connection, system_deployment_procedure) 지식 저장소 적재, `run_full_demo_scenario.ps1`으로 전체 시나리오(시드 → Agent Run) 1회 실행. 1차 실행 시 PowerShell 인코딩 이슈로 intent `unknown` → 스크립트를 `demo/demo_request_mixed.json` 직접 사용으로 수정. 재실행에서 Mixed(Compliance→RCA→Workflow) 전체 흐름 검증 완료: intent `mixed` 분류, 3개 서브그래프 순차 실행, 통합 요약 생성, 고위험 단계 승인 대기(`PENDING_APPROVAL`) 정상 동작 확인.
 
 ---
 
@@ -1883,6 +1883,7 @@ trace-ai/
 ├─ app/
 ├─ ui/
 ├─ scripts/
+└─ demo/
 ```
 
 ### 루트 파일 설명
@@ -2203,16 +2204,40 @@ ui/
 
 ```
 scripts/
-├─ seed_mock_docs.py
-├─ run_smoke.sh
+├─ fixtures/           # 테스트/데모용 요청 JSON·문서 (curl, 문서 예시 참조)
+│  ├─ test_request.json
+│  ├─ test_rca_request.json
+│  ├─ test_workflow_request.json
+│  ├─ test_mixed_request.json
+│  ├─ test_approve_request.json
+│  ├─ test_reject_request.json
+│  └─ test_policy.txt
+├─ seed_demo_docs.ps1  # 데모 문서 지식 저장소 적재
+└─ run_full_demo_scenario.ps1  # 전체 데모 시나리오 실행 (시드 → Agent Run)
 ```
 
-- 개발 편의용 스크립트
+- 개발·데모 편의용 스크립트 및 픽스처
 - 프로덕션 코드와 분리
 
 ---
 
-## 7. 구조 변경 금지 원칙
+## 7. demo/ 디렉터리
+
+```
+demo/
+├─ demo_docs/          # 데모용 지식 문서 (시드 스크립트에서 사용)
+│  ├─ policy_security_password.txt
+│  ├─ incident_redis_connection.txt
+│  └─ system_deployment_procedure.txt
+└─ demo_request_mixed.json  # Mixed Intent 요청 예시 (데모 리허설용)
+```
+
+- 데모 시나리오 전용 문서·요청 예시
+- `scripts/seed_demo_docs.ps1`, `scripts/run_full_demo_scenario.ps1`에서 참조
+
+---
+
+## 8. 구조 변경 금지 원칙
 
 - 본 구조는 **Code Freeze까지 유지**
 - 디렉터리/파일 추가 시:
@@ -2222,6 +2247,6 @@ scripts/
 
 ---
 
-## 8. 최종 선언
+## 9. 최종 선언
 
 본 문서는 TRACE-AI 프로젝트의 **구조적 단일 기준 문서**이며, 모든 코드 배치는 본 문서를 따른다.
